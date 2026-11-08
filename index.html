@@ -1,0 +1,1580 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='23' y='3' width='34' height='45' rx='3' fill='white' stroke='%23c8102e' stroke-width='3.5'/%3E%3Cpath d='M30 13h20M30 21h20M30 29h20M30 37h13' stroke='%23c8102e' stroke-width='2.6' stroke-linecap='round' opacity='.55'/%3E%3Crect x='3' y='21' width='39' height='29' rx='3' fill='white' stroke='%23c8102e' stroke-width='3.5'/%3E%3Crect x='7.5' y='26' width='10' height='13' rx='1.5' fill='%23fbecec' stroke='%23c8102e' stroke-width='2'/%3E%3Cpath d='M23 29h14M23 35h14M23 41h9' stroke='%23c8102e' stroke-width='2.6' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='50' r='11.5' fill='%23c8102e' stroke='white' stroke-width='3'/%3E%3Cpath d='M43.5 50.5l4.5 4.5 8.5-9.5' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<title>证票拼排助手</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+  /* ============ 设计变量：定版稿图7「报纸编辑」——朱红 + 纸色 + 宋体衬线 + 方角 ============ */
+  :root{
+    --accent:#c8102e; --accent-dark:#9c0c24; --accent-soft:#fbecec;
+    --bg:#f4f1ec; --panel:#fffdf8; --panel2:#faf6ee; --line:#ddd5c6; --border:#b8ab94;
+    --text:#191919; --muted:#6f6a5e; --danger:#c8102e; --danger-soft:#fbecec;
+    --radius:2px; --btn-radius:2px; --shadow:0 1px 0 rgba(0,0,0,.12);
+    --font:Georgia,"Songti SC","STSong","SimSun",serif;
+    --head-bg:#fffdf8; --head-text:#191919; --sheet-shadow:0 6px 24px rgba(25,25,25,.18);
+    --chip:#efe9dc;
+  }
+
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; }
+  body{ background:var(--bg); color:var(--text); font-family:var(--font); font-size:14px; line-height:1.5; }
+  button{ font-family:inherit; }
+  button:focus-visible, input:focus-visible, select:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .lucide{ width:16px; height:16px; stroke-width:2; }
+
+  /* ============ 顶部栏 ============ */
+  header.topbar{ background:var(--head-bg); color:var(--head-text); border-bottom:3px double var(--text); padding:10px 16px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; position:sticky; top:0; z-index:60; }
+  .brand{ display:flex; align-items:center; gap:10px; min-width:0; }
+  .brand .mark{ width:42px; height:42px; display:flex; align-items:center; justify-content:center; flex:none; line-height:0; }
+  .brand .mark svg{ width:100%; height:100%; display:block; }
+  .brand .titles{ text-align:left; margin:0; padding:0; }
+  .brand h1{ font-size:17px; margin:0; padding:0; text-indent:0; font-weight:700; letter-spacing:.5px; white-space:nowrap; text-align:left; }
+  /* 副标题与主标题同为块级、无缩进/内边距/字间距。字面左边缘对齐不能只靠盒子对齐：「证」在宋体里的左侧字怀（言字旁竖笔内缩）比 Georgia 字母 z 的左侧字怀大——按用户实机截图像素量测，盒子对齐时 z 的墨迹反而比「证」左边缘多出约2px。此处 +2px 为静态兜底值；页面脚本还会用 Canvas 实测两行首字的真实墨迹左怀并动态校正 margin-left（见脚本 calibrateBrandAlign），以适配不同设备/字体。桌面与手机共用此规则。 */
+  .brand small{ display:block; font-size:11px; color:var(--muted); font-weight:400; letter-spacing:0; text-align:left; margin:0 0 0 2px; padding:0; text-indent:0; }
+  .totals{ display:flex; gap:14px; font-size:13px; color:var(--muted); flex-wrap:wrap; }
+  .totals b{ color:var(--text); font-size:15px; }
+  .totals .grand b{ color:var(--accent); }
+  .top-actions{ margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+
+  .btn{ border:1px solid var(--border); border-radius:var(--btn-radius); padding:8px 14px; font-size:13px; cursor:pointer; background:var(--panel); color:var(--text); display:inline-flex; align-items:center; gap:6px; justify-content:center; transition:border-color .15s,color .15s,background .15s; min-height:38px; }
+  .btn:hover{ border-color:var(--accent); color:var(--accent); }
+  .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  .btn.primary:hover{ background:var(--accent-dark); border-color:var(--accent-dark); color:#fff; }
+  .btn.danger{ color:var(--danger); border-color:var(--border); }
+  .btn.danger:hover{ background:var(--danger-soft); border-color:var(--danger); color:var(--danger); }
+  .btn.small{ padding:5px 9px; font-size:12px; min-height:30px; }
+  .btn.block{ width:100%; }
+  .btn.active{ background:var(--accent); border-color:var(--accent); color:#fff; }
+
+  /* ============ 主布局 ============ */
+  .app{ display:grid; grid-template-columns:360px 1fr; gap:14px; padding:14px; max-width:1560px; margin:0 auto; align-items:start; }
+  @media (max-width:980px){ .app{ grid-template-columns:1fr; } }
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); margin-bottom:14px; }
+  .panel h2{ font-size:14.5px; margin:0 0 12px; display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--line); padding-bottom:9px; }
+  .panel h2 .num{ background:var(--accent); color:#fff; width:20px; height:20px; border-radius:50%; font-size:12px; display:inline-flex; align-items:center; justify-content:center; flex:none; }
+  .panel h2 .num{ border-radius:0; background:var(--text); }
+  .panel h2 .right{ margin-left:auto; font-size:12px; color:var(--muted); font-weight:400; }
+
+  .mode-tabs{ display:grid; grid-template-columns:1fr 1fr; gap:6px; background:var(--chip); padding:5px; border-radius:var(--radius); margin-bottom:14px; }
+  .mode-tabs button{ border:none; background:transparent; padding:9px 4px; border-radius:calc(var(--radius) - 3px); font-size:13.5px; cursor:pointer; color:var(--muted); display:flex; align-items:center; justify-content:center; gap:6px; min-height:40px; }
+  .mode-tabs button.active{ background:var(--panel); color:var(--accent); font-weight:700; box-shadow:var(--shadow); }
+
+  .dropzone{ border:1.5px dashed var(--border); border-radius:var(--radius); padding:18px 10px; text-align:center; color:var(--muted); font-size:13px; cursor:pointer; background:var(--panel2); transition:.15s; }
+  .dropzone:hover,.dropzone.hover{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+  .dropzone .big{ font-size:15px; font-weight:600; color:var(--text); display:block; margin-bottom:2px; }
+  .dropzone:hover .big{ color:var(--accent); }
+
+  .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:9px 0; }
+  .row label{ color:var(--muted); font-size:13px; white-space:nowrap; }
+  select,input[type=text],input[type=number],input[type=date]{ border:1px solid var(--border); border-radius:var(--btn-radius); padding:7px 9px; font-size:13px; background:var(--panel); color:var(--text); min-height:36px; }
+  select:focus,input:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); }
+  input[type=number]{ width:74px; }
+  input[type=color]{ border:1px solid var(--border); border-radius:var(--btn-radius); width:44px; height:36px; padding:2px; background:var(--panel); cursor:pointer; }
+  input[type=range]{ accent-color:var(--accent); flex:1; min-width:90px; }
+  .field{ display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); flex:1; min-width:0; }
+  .field input,.field select{ width:100%; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+  .seg{ display:flex; gap:6px; }
+  .seg button{ flex:1; padding:8px 2px; border:1px solid var(--border); background:var(--panel); border-radius:var(--btn-radius); font-size:13px; color:var(--text); cursor:pointer; min-height:38px; display:inline-flex; align-items:center; justify-content:center; gap:5px; }
+  .seg button.active{ background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  .preset-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .preset-grid button{ border:1px solid var(--border); background:var(--panel); border-radius:var(--btn-radius); padding:9px 10px; text-align:left; cursor:pointer; color:var(--text); }
+  .preset-grid button b{ display:block; font-size:13.5px; }
+  .preset-grid button span{ font-size:11.5px; color:var(--muted); }
+  .preset-grid button.active{ border-color:var(--accent); background:var(--accent-soft); box-shadow:0 0 0 1px var(--accent) inset; }
+  .check{ display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; padding:4px 0; color:var(--text); }
+  .check input{ width:17px; height:17px; accent-color:var(--accent); }
+  .tip{ font-size:12px; color:var(--muted); margin:6px 0 0; }
+  .mode-sec{ display:none; }
+  .mode-sec.show{ display:block; }
+
+  /* 列表 */
+  #itemList{ display:flex; flex-direction:column; gap:10px; max-height:520px; overflow:auto; padding-right:2px; }
+  .card{ border:1px solid var(--line); border-radius:var(--radius); background:var(--panel2); overflow:hidden; }
+  .card.sel{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .card .chead{ display:flex; gap:10px; padding:8px; align-items:center; cursor:pointer; }
+  .card .thumb{ width:74px; height:48px; object-fit:cover; border-radius:6px; background:#dfe5ec; flex:none; border:1px solid var(--line); }
+  .card .thumb.text-thumb{ display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; color:var(--text); background:var(--accent-soft); padding:4px; text-align:center; overflow:hidden; }
+  .card .cname{ font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .card .cmeta{ font-size:11.5px; color:var(--muted); }
+  .card .kindtag{ font-size:11px; padding:2px 7px; border-radius:999px; background:var(--accent-soft); color:var(--accent); font-weight:600; flex:none; }
+  .card .kindtag.inv{ background:var(--chip); color:var(--muted); }
+  .card .amtgrid{ display:grid; grid-template-columns:1fr 1fr; gap:7px; padding:0 8px 9px; }
+  .card .amtgrid .field input{ min-height:32px; padding:5px 7px; }
+  .ocr-status{ margin:0 8px 8px; padding:7px 9px; border-radius:7px; font-size:12px; line-height:1.45; background:var(--chip); color:var(--muted); }
+  .ocr-status.recognizing{ background:var(--accent-soft); color:var(--accent); }
+  .ocr-status.ok{ background:#e6f4ea; color:#1e7d3a; }
+  .ocr-status.partial{ background:#fdf3e0; color:#9a6a12; }
+  .ocr-status.fail{ background:var(--danger-soft); color:var(--danger); }
+  @media (prefers-color-scheme:dark){ .ocr-status.ok{ background:#17301f; color:#7fd598; } .ocr-status.partial{ background:#3a2f14; color:#e8c37a; } }
+  .card .ops{ display:flex; gap:5px; padding:0 8px 9px; flex-wrap:wrap; }
+  .empty-tip{ color:var(--muted); font-size:13px; text-align:center; padding:22px 8px; border:1px dashed var(--line); border-radius:var(--radius); }
+
+  /* ============ 纸面预览 ============ */
+  .stage-panel{ padding:14px; }
+  .stage-head{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .stage-head h2{ font-size:14.5px; margin:0; display:flex; align-items:center; gap:8px; }
+  .stage-head .spacer{ flex:1; }
+  .stage-tools{ display:flex; gap:7px; flex-wrap:wrap; }
+  #sheetsWrap{ display:flex; flex-direction:column; align-items:center; gap:26px; padding:8px 0 6px; }
+  .sheet-holder{ text-align:center; }
+  .sheet-tag{ font-size:12px; color:var(--muted); margin-bottom:7px; }
+  .sheet{ background:#fff; color:#111; position:relative; overflow:hidden; box-shadow:var(--sheet-shadow); margin:0 auto; text-align:left;
+    background-image:linear-gradient(#f2f5f9 1px,transparent 1px),linear-gradient(90deg,#f2f5f9 1px,transparent 1px); }
+  .sheet-item{ position:absolute; overflow:hidden; background:#fff; }
+  .sheet-item img{ width:100%; height:100%; display:block; pointer-events:none; -webkit-user-drag:none; }
+  .sheet-item.draggable{ cursor:move; touch-action:none; }
+  .sheet-item.selected{ outline:2px solid var(--accent); outline-offset:1px; z-index:5; }
+  .sheet-item .bord{ position:absolute; inset:0; border:1px solid #94a3b8; pointer-events:none; display:none; }
+  .sheet-item.hasbord .bord{ display:block; }
+  .sheet-item.text-item{ background:transparent; overflow:visible; display:flex; align-items:center; justify-content:center; font-weight:600; white-space:nowrap; }
+  .cut-v{ position:absolute; top:0; bottom:0; border-left:1px dashed #b6c2d2; pointer-events:none; z-index:8; }
+  .cut-h{ position:absolute; left:0; right:0; border-top:1px dashed #b6c2d2; pointer-events:none; z-index:8; }
+  .pagenum{ position:absolute; bottom:4mm; left:0; right:0; text-align:center; font-size:9pt; color:#666; pointer-events:none; z-index:8; }
+  .wm-layer{ position:absolute; inset:0; pointer-events:none; z-index:9; overflow:hidden; }
+  .wm-layer span{ position:absolute; font-weight:700; white-space:nowrap; }
+  .no-page{ color:var(--muted); text-align:center; padding:44px 10px; font-size:13.5px; }
+
+  #itemBar{ position:fixed; display:none; gap:2px; background:rgba(17,22,30,.92); border-radius:9px; padding:5px; box-shadow:0 8px 20px rgba(0,0,0,.25); z-index:90; }
+  #itemBar button{ background:transparent; color:#fff; border:none; font-size:12px; padding:6px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; }
+  #itemBar button:hover{ background:rgba(255,255,255,.16); }
+  #itemBar button.del{ color:#ff9b9e; }
+  #itemBar .lucide{ width:13px; height:13px; }
+
+  /* ============ 拍摄弹窗 ============ */
+  .camera-wrap{ background:#10161f; border-radius:var(--radius); padding:10px; text-align:center; overflow:hidden; }
+  .camera-wrap video{ width:100%; max-height:58vh; background:#000; border-radius:6px; display:block; object-fit:contain; }
+  .camera-tip{ font-size:12.5px; color:var(--muted); margin:8px 0 0; text-align:center; }
+
+  /* ============ 裁剪弹窗 ============ */
+  .crop-wrap{ background:#20262f; border-radius:var(--radius); padding:14px 10px; text-align:center; overflow:hidden; }
+  .crop-stage{ position:relative; display:inline-block; max-width:100%; line-height:0; touch-action:none; cursor:crosshair; }
+  .crop-stage img{ max-width:100%; max-height:56vh; display:block; user-select:none; -webkit-user-drag:none; pointer-events:none; }
+  .crop-rect{ position:absolute; border:2px solid var(--accent); box-shadow:0 0 0 9999px rgba(8,12,18,.52); cursor:move; box-sizing:border-box; }
+  .crop-rect .ch{ position:absolute; width:18px; height:18px; margin:-9px 0 0 -9px; background:#fff; border:2px solid var(--accent); border-radius:50%; box-sizing:border-box; z-index:2; }
+  .crop-rect .ch.nw{ left:0; top:0; cursor:nwse-resize; }
+  .crop-rect .ch.ne{ left:100%; top:0; cursor:nesw-resize; }
+  .crop-rect .ch.sw{ left:0; top:100%; cursor:nesw-resize; }
+  .crop-rect .ch.se{ left:100%; top:100%; cursor:nwse-resize; }
+  .crop-rect .ch.n{ left:50%; top:0; cursor:ns-resize; }
+  .crop-rect .ch.s{ left:50%; top:100%; cursor:ns-resize; }
+  .crop-rect .ch.w{ left:0; top:50%; cursor:ew-resize; }
+  .crop-rect .ch.e{ left:100%; top:50%; cursor:ew-resize; }
+  .crop-foot-left{ margin-right:auto; display:flex; gap:8px; flex-wrap:wrap; }
+
+  /* ============ 弹窗 ============ */
+  .modal{ position:fixed; inset:0; background:rgba(12,18,28,.55); display:none; align-items:flex-start; justify-content:center; z-index:120; padding:18px 10px; overflow:auto; }
+  .modal.show{ display:flex; }
+  .modal-box{ background:var(--panel); color:var(--text); border-radius:var(--radius); width:min(860px,97vw); padding:20px; box-shadow:0 18px 50px rgba(0,0,0,.3); }
+  .modal-box.narrow{ width:min(480px,97vw); }
+  .modal-box h3{ margin:0 0 12px; font-size:16px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .modal-close{ border:1px solid var(--border); background:var(--panel); color:var(--muted); border-radius:var(--btn-radius); width:32px; height:32px; cursor:pointer; font-size:15px; flex:none; }
+  .modal-foot{ display:flex; justify-content:flex-end; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  table.sum{ width:100%; border-collapse:collapse; font-size:13px; }
+  table.sum th, table.sum td{ border-bottom:1px solid var(--line); padding:8px 7px; text-align:left; vertical-align:top; }
+  table.sum th{ color:var(--muted); font-weight:600; font-size:12px; }
+  table.sum td.num, table.sum th.num{ text-align:right; font-variant-numeric:tabular-nums; }
+  table.sum td input{ width:100%; border:1px solid var(--border); border-radius:6px; padding:6px 7px; font-size:13px; background:var(--panel); color:var(--text); min-height:32px; }
+  table.sum td input[type=number]{ text-align:right; }
+  table.sum td.col-date{ min-width:138px; } table.sum td.col-seller{ min-width:170px; } table.sum td.col-amt{ min-width:104px; }
+  table.sum tfoot td{ font-weight:700; border-top:2px solid var(--border); border-bottom:none; }
+  .sum-scroll{ overflow-x:auto; }
+  @media (max-width:640px){
+    table.sum thead{ display:none; }
+    table.sum tr{ display:block; border:1px solid var(--line); border-radius:var(--radius); margin-bottom:9px; padding:6px 4px; }
+    table.sum td{ display:flex; justify-content:space-between; gap:12px; border-bottom:none; padding:5px 8px; text-align:right; }
+    table.sum td::before{ content:attr(data-l); color:var(--muted); font-size:12px; text-align:left; }
+    table.sum tfoot tr{ border:none; margin:0; padding:0; }
+  }
+  .toast{ position:fixed; top:16px; left:50%; transform:translateX(-50%); background:rgba(17,22,30,.93); color:#fff; padding:10px 18px; border-radius:9px; font-size:13.5px; z-index:200; display:none; max-width:92vw; text-align:center; }
+  .toast.show{ display:block; }
+  footer.credit{ text-align:center; color:var(--muted); font-size:12.5px; padding:6px 14px 26px; }
+  footer.credit a{ color:var(--accent); text-decoration:none; font-weight:600; }
+
+  /* ============ 打印：只输出纸面 ============ */
+  @page{ margin:0; }
+  @media print{
+    body{ background:#fff !important; }
+    header.topbar,.left-col,.stage-head,footer.credit,#itemBar,.toast,.modal{ display:none !important; }
+    .app{ display:block !important; padding:0 !important; max-width:none !important; }
+    .panel{ border:none !important; box-shadow:none !important; padding:0 !important; margin:0 !important; border-radius:0 !important; }
+    #sheetsWrap{ gap:0 !important; padding:0 !important; }
+    .sheet-holder{ page-break-after:always; break-after:page; }
+    .sheet-tag{ display:none !important; }
+    .sheet{ box-shadow:none !important; background-image:none !important; }
+    .sheet-item.selected{ outline:none !important; }
+  }
+  @media (max-width:640px){
+    header.topbar{ padding:10px 12px; }
+    .brand{ gap:8px; }
+    .brand .mark{ width:36px; height:36px; }
+    .brand h1{ font-size:15.5px; }
+    .totals{ order:3; width:100%; }
+    .app{ padding:10px; gap:10px; }
+    .panel{ padding:13px; }
+    .top-actions .btn{ flex:1; }
+    #itemList{ max-height:none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="mark" aria-hidden="true"><svg viewBox="0 0 64 64" role="img" aria-label="证票拼排助手标志"><rect x="23" y="3" width="34" height="45" rx="3" fill="#fff" stroke="#c8102e" stroke-width="3.5"/><path d="M30 13h20M30 21h20M30 29h20M30 37h13" stroke="#c8102e" stroke-width="2.6" stroke-linecap="round" opacity=".55"/><rect x="3" y="21" width="39" height="29" rx="3" fill="#fff" stroke="#c8102e" stroke-width="3.5"/><rect x="7.5" y="26" width="10" height="13" rx="1.5" fill="#fbecec" stroke="#c8102e" stroke-width="2"/><path d="M23 29h14M23 35h14M23 41h9" stroke="#c8102e" stroke-width="2.6" stroke-linecap="round"/><circle cx="50" cy="50" r="11.5" fill="#c8102e" stroke="#fff" stroke-width="3"/><path d="M43.5 50.5l4.5 4.5 8.5-9.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="titles"><h1>证票拼排助手</h1><small>zp.1672268.xyz</small></div>
+  </div>
+  <div class="top-actions">
+    <button class="btn" id="btnSummary"><i data-lucide="table-properties"></i>报销汇总表</button>
+    <button class="btn danger" id="btnClear"><i data-lucide="trash-2"></i>清空当前模式</button>
+    <button class="btn" id="btnPng"><i data-lucide="image-down"></i>保存图片</button>
+    <button class="btn primary" id="btnPrint"><i data-lucide="printer"></i>打印 / 导出PDF</button>
+  </div>
+</header>
+
+<div class="app">
+  <!-- ================= 左侧控制列 ================= -->
+  <div class="left-col">
+    <div class="mode-tabs" role="tablist" aria-label="拼排模式">
+      <button data-mode="doc" class="active"><i data-lucide="id-card"></i>证件拼排</button>
+      <button data-mode="inv"><i data-lucide="receipt-text"></i>发票拼排</button>
+    </div>
+
+    <section class="panel">
+      <h2><span class="num">1</span>文件录入</h2>
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="上传文件">
+        <span class="big">点击选择，或把文件拖到这里</span>
+        支持 JPG / PNG / WEBP 图片，发票可传 PDF（取第一页）· 可多选
+      </div>
+      <input type="file" id="fileInput" accept="image/*,application/pdf" multiple hidden>
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
+      <div id="cameraRow" style="margin-top:10px">
+        <button class="btn primary block" id="btnCamera" type="button"><i data-lucide="camera"></i>拍摄证件</button>
+        <p class="tip">点拍摄调用摄像头拍照，拍完直接加入证件列表排版；手机上优先使用后置摄像头。若摄像头不可用或未授权，会自动改用选文件 / 系统相机。</p>
+      </div>
+      <button class="btn block" id="btnAddText" style="margin-top:10px"><i data-lucide="type"></i>加文字说明</button>
+    </section>
+
+    <!-- 证件设置 -->
+    <div class="mode-sec show" id="sec-doc">
+      <section class="panel">
+        <h2><span class="num">2</span>证件类型与尺寸</h2>
+        <div class="row"><label for="docType">类型</label>
+          <select id="docType" style="flex:1;min-width:0">
+            <option value="85.6x54.0">中国居民身份证（85.6×54.0mm）</option>
+            <option value="85.6x54.0b">银行卡 / 社保卡 / 港澳通行证（85.6×54.0mm）</option>
+            <option value="88x60">驾驶证（88×60mm）</option>
+            <option value="105x143">户口簿内页（105×143mm）</option>
+            <option value="custom">自定义…</option>
+          </select>
+        </div>
+        <p class="tip" style="margin-top:2px">中国居民身份证标准规格：85.6mm × 54.0mm，按此尺寸1:1排版打印，不缩放拉伸。</p>
+        <div class="grid2" id="customSizeRow" style="display:none">
+          <div class="field">宽（mm）<input type="number" id="customW" value="85.6" min="10" max="200" step="0.1"></div>
+          <div class="field">高（mm）<input type="number" id="customH" value="54.0" min="10" max="280" step="0.1"></div>
+        </div>
+        <div class="row"><label for="docGap">间距（mm）</label><input type="number" id="docGap" value="5" min="0" max="30" step="1"><span class="tip" style="margin:0">证件较大时自动缩小间隙</span></div>
+        <div class="row"><label>排列方式</label>
+          <div class="seg" style="flex:1">
+            <button id="dirV" class="active"><i data-lucide="move-vertical"></i>竖排</button>
+            <button id="dirH"><i data-lucide="move-horizontal"></i>横排</button>
+          </div>
+        </div>
+        <div class="row"><label>页边距（mm）</label><input type="range" id="docMargin" min="0" max="20" value="8"><b id="docMarginVal" style="font-size:13px">8</b></div>
+        <button class="btn primary block" id="btnAutoDoc"><i data-lucide="wand-sparkles"></i>自动排版</button>
+        <p class="tip">证件拼排默认水平居中、垂直居中：新加入的证件自动放在纸面中央；在纸面上也可以直接拖动调整位置。</p>
+      </section>
+    </div>
+
+    <!-- 发票设置 -->
+    <div class="mode-sec" id="sec-inv">
+      <section class="panel">
+        <h2><span class="num">2</span>发票排版设置</h2>
+        <div class="row" style="margin-top:0"><label>电子普通发票预设</label></div>
+        <div class="preset-grid" id="einvPreset">
+          <button data-einv="full"><b>整表 1张 / 页</b><span>原版式210×140mm · A4纵向完整打印</span></button>
+          <button data-einv="half"><b>整表 2张 / 页</b><span>A4纵向上下拼 · 缩小后字偏小</span></button>
+        </div>
+        <p class="tip">电子发票（普通发票）是一整张表：表头、购买方/销售方信息、项目明细、合计、价税合计（大写/小写）、备注、开票人，红色表格线。拼排时整张完整显示、保持比例，不拆分、不拉伸填格。</p>
+        <div class="row"><label>拼版布局</label></div>
+        <div class="preset-grid" id="presetGrid">
+          <button data-layout="1x1"><b>1张 / 页</b><span>原尺寸 / 全页</span></button>
+          <button data-layout="1x2" class="active"><b>2张 / 页（纵）</b><span>上下各1张</span></button>
+          <button data-layout="2x1"><b>2张 / 页（横）</b><span>左右各1张</span></button>
+          <button data-layout="2x2"><b>4张 / 页</b><span>田字格 2×2 · 每张转90°竖放</span></button>
+          <button data-layout="2x3" style="grid-column:1/-1"><b>6张 / 页</b><span>适合出租车票 / 小额发票（2×3）</span></button>
+        </div>
+        <div class="grid2" style="margin-top:10px">
+          <div class="field">纸张规格
+            <select id="paperSize"><option value="a4">A4（210×297mm）</option><option value="a5">A5（148×210mm）</option></select>
+          </div>
+          <div class="field">方向
+            <select id="paperOrient"><option value="portrait">纵向</option><option value="landscape">横向</option></select>
+          </div>
+        </div>
+        <div class="row"><label>页边距</label><input type="range" id="invMargin" min="0" max="25" value="5"><b id="invMarginVal" style="font-size:13px">5mm</b></div>
+        <div class="row"><label>发票间距</label><input type="range" id="invGap" min="0" max="20" value="3"><b id="invGapVal" style="font-size:13px">3mm</b></div>
+        <div class="field" style="margin:6px 0">发票适配模式
+          <select id="fitMode"><option value="contain">保持比例（完整显示）</option><option value="cover">裁剪填充（填满格）</option><option value="fill">拉伸填满</option></select>
+        </div>
+        <label class="check"><input type="checkbox" id="optCut" checked>显示虚线裁切线（方便剪裁）</label>
+        <label class="check"><input type="checkbox" id="optBorder">发票加上实线边框</label>
+        <label class="check"><input type="checkbox" id="optPageNum" checked>显示页脚页码</label>
+        <p class="tip">发票上传后会在本机自动识别开票日期、销售方全名、不含税金额、税额和价税合计，并填入下方列表与报销汇总表：图片在本机浏览器里识别，PDF优先读文字层，识别过程不把图片上传到服务器。识别中会显示状态；识别不完整或失败时会提示手动填写。每行日期、销售方、金额都可直接修改，改完汇总表合计自动同步。</p>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2><span class="num">3</span>内容列表<span class="right" id="listCount">0 项 · 可多页</span></h2>
+      <div id="itemList"><div class="empty-tip">还没有内容。上传文件，或在证件拼排里点「拍摄证件」拍照加入。</div></div>
+    </section>
+
+    <section class="panel">
+      <h2><span class="num">4</span>水印</h2>
+      <div class="field">水印文字（留空则不加）
+        <input type="text" id="wmText" placeholder="如：仅供办理业务使用">
+      </div>
+      <div class="grid2" style="margin-top:9px">
+        <div class="field">字号（px）<input type="number" id="wmSize" value="26" min="10" max="80"></div>
+        <div class="field">透明度（%）<input type="number" id="wmOpacity" value="14" min="3" max="60"></div>
+        <div class="field">角度（°）<input type="number" id="wmAngle" value="-28" min="-80" max="80"></div>
+        <div class="field">平铺间距（px）<input type="number" id="wmSpace" value="170" min="80" max="400"></div>
+      </div>
+      <div class="row"><label for="wmColor">颜色</label><input type="color" id="wmColor" value="#5b7a99"><button class="btn small" id="btnWmApply" style="margin-left:auto"><i data-lucide="droplets"></i>应用到所有页</button></div>
+    </section>
+  </div>
+
+  <!-- ================= 右侧纸面 ================= -->
+  <section class="panel stage-panel">
+    <div class="stage-head">
+      <h2><i data-lucide="scan-eye" style="color:var(--accent)"></i><span id="stageTitle">A4 拼版预览（拖动图片调整位置）</span></h2>
+      <div class="spacer"></div>
+      <div class="stage-tools">
+        <button class="btn small" id="btnZoomOut"><i data-lucide="zoom-out"></i>缩小</button>
+        <b id="zoomLabel" style="font-size:13px;min-width:44px;text-align:center">100%</b>
+        <button class="btn small" id="btnZoomIn"><i data-lucide="zoom-in"></i>放大</button>
+        <button class="btn small" id="btnAuto2"><i data-lucide="layout-template"></i>重新排版</button>
+      </div>
+    </div>
+    <div id="sheetsWrap"></div>
+    <p class="tip" id="printTip">打印提示：点右上角「打印 / 导出PDF」后，在系统打印框里选 A4、无边距效果最佳；若预览里无反应，可先「保存图片」再打印图片。</p>
+  </section>
+</div>
+
+<footer class="credit">证票拼排助手由曾工构建 · <a href="https://1672268.xyz" target="_blank" rel="noopener">曾工网络自留地</a></footer>
+
+<!-- 选中项浮动工具条 -->
+<div id="itemBar" role="toolbar">
+  <button data-act="edit"><i data-lucide="pencil"></i>改字</button>
+  <button data-act="crop"><i data-lucide="crop"></i>裁剪</button>
+  <button data-act="rot"><i data-lucide="rotate-cw"></i>旋转</button>
+  <button data-act="up"><i data-lucide="plus"></i>放大</button>
+  <button data-act="down"><i data-lucide="minus"></i>缩小</button>
+  <button data-act="front"><i data-lucide="arrow-up-to-line"></i>置顶</button>
+  <button data-act="dup"><i data-lucide="copy"></i>复制</button>
+  <button data-act="del" class="del"><i data-lucide="x"></i>删除</button>
+</div>
+
+<!-- 报销汇总弹窗 -->
+<div class="modal" id="summaryModal" role="dialog" aria-modal="true" aria-label="发票报销汇总表">
+  <div class="modal-box">
+    <h3>发票报销汇总表 <button class="modal-close" data-close="summaryModal" aria-label="关闭">✕</button></h3>
+    <div class="sum-scroll">
+      <table class="sum">
+        <thead><tr><th style="width:36px">#</th><th>发票名称</th><th>开票日期</th><th>销售方</th><th class="num">金额（不含税）</th><th class="num">税额</th><th class="num">价税合计</th></tr></thead>
+        <tbody id="sumBody"></tbody>
+        <tfoot><tr><td colspan="4">合计</td><td class="num" id="sumNet">¥0.00</td><td class="num" id="sumTax">¥0.00</td><td class="num" id="sumGrand">¥0.00</td></tr></tfoot>
+      </table>
+    </div>
+    <p class="tip">表中每行的开票日期、销售方、不含税金额和税额都可直接修改，改完下方合计自动同步；价税合计按不含税金额＋税额自动计算。</p>
+    <p class="tip" id="sumEmpty" style="display:none">还没有发票。在发票拼排模式下添加发票，上传后会自动识别日期、销售方和金额，也可手动填写。</p>
+    <div class="modal-foot">
+      <button class="btn" id="btnCsv"><i data-lucide="file-down"></i>导出 CSV</button>
+      <button class="btn primary" data-close="summaryModal">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 文字编辑弹窗 -->
+<div class="modal" id="textModal" role="dialog" aria-modal="true" aria-label="文字说明">
+  <div class="modal-box narrow">
+    <h3>文字说明 <button class="modal-close" data-close="textModal" aria-label="关闭">✕</button></h3>
+    <div class="field">文字内容<input type="text" id="txtContent" placeholder="如：身份证正反面复印件"></div>
+    <div class="grid2" style="margin-top:9px">
+      <div class="field">字号（mm）<input type="number" id="txtSize" value="5" min="2" max="20" step="0.5"></div>
+      <div class="field">颜色<input type="color" id="txtColor" value="#111111" style="width:100%"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close="textModal">取消</button>
+      <button class="btn primary" id="btnTextOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 拍摄弹窗 -->
+<div class="modal" id="cameraModal" role="dialog" aria-modal="true" aria-label="拍摄证件">
+  <div class="modal-box">
+    <h3>拍摄证件 <button class="modal-close" id="btnCameraClose" aria-label="关闭">✕</button></h3>
+    <p class="tip" style="margin-top:0">将证件放平、光线均匀，尽量让证件填满画面后点「拍照」。拍完照片会直接加入证件列表并排版。</p>
+    <div class="camera-wrap">
+      <video id="cameraVideo" autoplay playsinline muted></video>
+    </div>
+    <p class="camera-tip" id="cameraStatus">正在打开摄像头…</p>
+    <canvas id="cameraCanvas" hidden></canvas>
+    <div class="modal-foot">
+      <button class="btn" id="btnCameraCancel">取消</button>
+      <button class="btn primary" id="btnShutter"><i data-lucide="camera"></i>拍照</button>
+    </div>
+  </div>
+</div>
+
+<!-- 裁剪弹窗 -->
+<div class="modal" id="cropModal" role="dialog" aria-modal="true" aria-label="裁剪图片">
+  <div class="modal-box">
+    <h3>裁剪图片 <button class="modal-close" data-close="cropModal" aria-label="关闭">✕</button></h3>
+    <p class="tip" style="margin-top:0">在图上拖动框选要保留的区域：拖动选框可移动位置，拖动边缘或四角圆点可调整大小。点「确认裁剪」才生效，取消不会改动原图。裁剪后图片仍按原来的证件/发票尺寸排版打印，不会改变打印大小。</p>
+    <div class="crop-wrap">
+      <div class="crop-stage" id="cropStage">
+        <img id="cropImg" alt="待裁剪图片">
+        <div class="crop-rect" id="cropRect">
+          <span class="ch nw" data-h="nw"></span><span class="ch n" data-h="n"></span><span class="ch ne" data-h="ne"></span>
+          <span class="ch e" data-h="e"></span><span class="ch se" data-h="se"></span><span class="ch s" data-h="s"></span>
+          <span class="ch sw" data-h="sw"></span><span class="ch w" data-h="w"></span>
+        </div>
+      </div>
+    </div>
+    <p class="tip" id="cropInfo">选区：—</p>
+    <div class="modal-foot">
+      <div class="crop-foot-left">
+        <button class="btn" id="btnCropFull">选全图</button>
+        <button class="btn" id="btnCropRestore" style="display:none">恢复原图</button>
+      </div>
+      <button class="btn" data-close="cropModal">取消</button>
+      <button class="btn primary" id="btnCropOk">确认裁剪</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+/* ---------------- 状态 ---------------- */
+var uid = 0;
+var state = {
+  mode: 'doc',
+  items: [],           // {id,kind:'doc'|'inv'|'text',src,name,x,y,manual,rot,scale,text,size,color, invName,date,seller,net,tax}
+  selectedId: null,
+  zoom: 1,
+  docDir: 'v',
+  wm: { text:'', size:26, opacity:14, angle:-28, color:'#5b7a99', space:170 }
+};
+function $(id){ return document.getElementById(id); }
+/* 内容按模式分开：证件与文字归证件拼排，发票归发票拼排；按类型自动归类，互不串扰 */
+function bucketOf(it){ return it.bucket || (it.kind === 'inv' ? 'inv' : 'doc'); }
+function visibleItems(){ return state.items.filter(function(it){ return bucketOf(it) === state.mode; }); }
+function docItems(){ return state.items.filter(function(it){ return bucketOf(it) === 'doc'; }); }
+function money(v){ return '¥' + (Math.round((+v||0)*100)/100).toLocaleString('zh-CN',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+var toastTimer = null;
+function toast(msg){ var t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.classList.remove('show'); }, 2400); }
+
+/* ---------------- 尺寸设置读取 ---------------- */
+function docSize(){
+  var v = $('docType').value;
+  if (v === 'custom') return { w: Math.max(10, parseFloat($('customW').value)||85.6), h: Math.max(10, parseFloat($('customH').value)||54.0) };
+  var p = v.replace('b','').split('x'); return { w: parseFloat(p[0]), h: parseFloat(p[1]) };
+}
+function paperDims(){
+  if (state.mode === 'inv'){
+    var a4 = $('paperSize').value === 'a4';
+    var w = a4 ? 210 : 148, h = a4 ? 297 : 210;
+    if ($('paperOrient').value === 'landscape'){ var t=w; w=h; h=t; }
+    return { w:w, h:h };
+  }
+  return { w:210, h:297 };
+}
+function settings(){
+  if (state.mode === 'doc') return { margin: +$('docMargin').value, gap: Math.max(0, +$('docGap').value||0) };
+  return { margin: +$('invMargin').value, gap: Math.max(0, +$('invGap').value||0) };
+}
+function itemSize(it){
+  if (it.kind === 'text'){
+    var fs = it.size || 5;
+    return { w: Math.max(20, (it.text||'').length * fs * 1.05), h: fs * 1.7 };
+  }
+  if (state.mode === 'inv') return null; // 网格决定
+  if (it.kind === 'doc'){ var d = docSize(); return { w: d.w * it.scale, h: d.h * it.scale }; }
+  return { w: 190 * it.scale, h: 95 * it.scale }; // 非当前模式图片的占位尺寸
+}
+var LAYOUTS = { '1x1':[1,1], '1x2':[1,2], '2x1':[2,1], '2x2':[2,2], '2x3':[2,3] };
+function invLayout(){ var sel = document.querySelector('#presetGrid button.active'); return LAYOUTS[sel ? sel.dataset.layout : '1x2']; }
+/* 4张/页（2×2）时每张发票在格内顺时针转90°竖放：格子仍2×2，额外旋转90°（其余布局不加） */
+function invExtraRot(){ if (state.mode !== 'inv') return 0; var lay = invLayout(); return (lay[0] === 2 && lay[1] === 2) ? 90 : 0; }
+function invEffRot(it){ return (((it.rot||0) + invExtraRot()) % 360 + 360) % 360; }
+
+/* ---------------- 排版算法 ---------------- */
+function layoutPages(){
+  var paper = paperDims(), st = settings();
+  var availW = paper.w - st.margin*2, availH = paper.h - st.margin*2;
+  var pages = [[]];
+  function newPage(){ pages.push([]); }
+  function cur(){ return pages[pages.length-1]; }
+
+  if (state.mode === 'inv'){
+    var lay = invLayout(), cols = lay[0], rows = lay[1], per = cols*rows;
+    var cellW = (availW - st.gap*(cols-1)) / cols, cellH = (availH - st.gap*(rows-1)) / rows;
+    var idx = 0;
+    visibleItems().forEach(function(it){
+      if (idx > 0 && idx % per === 0) newPage();
+      var c = idx % per, col = c % cols, row = Math.floor(c / cols);
+      cur().push({ it: it, x: st.margin + col*(cellW+st.gap), y: st.margin + row*(cellH+st.gap), w: cellW, h: cellH, cell:true });
+      idx++;
+    });
+    return { pages: pages, paper: paper };
+  }
+
+  // doc：流式排版（manual 项用手动坐标，其余接续排）
+  var flow = visibleItems().filter(function(it){ return !it.manual; });
+  var manual = visibleItems().filter(function(it){ return it.manual; });
+  var gap = st.gap;
+  if (state.mode === 'doc'){
+    // 证件过大时自动缩小间隙
+    var d0 = docSize();
+    if (d0.w > availW || d0.h > availH) gap = Math.min(gap, 2);
+  }
+  var x = st.margin, y = st.margin, colMaxW = 0, rowMaxH = 0;
+  function place(it){
+    var s = itemSize(it), w = s.w, h = s.h;
+    if (state.docDir === 'v' && state.mode === 'doc'){
+      if (y + h > st.margin + availH && y > st.margin){ x += colMaxW + gap; y = st.margin; colMaxW = 0; }
+      if (x + w > st.margin + availW && x > st.margin){ newPage(); x = st.margin; y = st.margin; colMaxW = 0; }
+      if (y + h > st.margin + availH && y > st.margin){ newPage(); x = st.margin; y = st.margin; colMaxW = 0; }
+      cur().push({ it: it, x: x, y: y, w: w, h: h });
+      y += h + gap; colMaxW = Math.max(colMaxW, w);
+    } else {
+      if (x + w > st.margin + availW && x > st.margin){ x = st.margin; y += rowMaxH + gap; rowMaxH = 0; }
+      if (y + h > st.margin + availH && y > st.margin){ newPage(); x = st.margin; y = st.margin; rowMaxH = 0; }
+      if (x + w > st.margin + availW && x > st.margin){ newPage(); x = st.margin; y = st.margin; rowMaxH = 0; }
+      cur().push({ it: it, x: x, y: y, w: w, h: h });
+      x += w + gap; rowMaxH = Math.max(rowMaxH, h);
+    }
+  }
+  flow.forEach(place);
+  // 证件拼排默认居中：自动排版的证件在纸面上水平居中 + 垂直居中（手动拖动项不参与）
+  if (state.mode === 'doc'){
+    pages.forEach(function(pg){
+      if (!pg.length) return;
+      var minX = Math.min.apply(null, pg.map(function(p){ return p.x; }));
+      var maxX = Math.max.apply(null, pg.map(function(p){ return p.x + p.w; }));
+      var minY = Math.min.apply(null, pg.map(function(p){ return p.y; }));
+      var maxY = Math.max.apply(null, pg.map(function(p){ return p.y + p.h; }));
+      if (state.docDir === 'v'){
+        // 按列分组：每列内部水平居中、整列垂直居中；所有列作为整体水平居中
+        var cols = {};
+        pg.forEach(function(p){ var k = Math.round(p.x*10)/10; (cols[k] = cols[k] || []).push(p); });
+        Object.keys(cols).forEach(function(k){
+          var col = cols[k];
+          var colW = Math.max.apply(null, col.map(function(p){ return p.w; }));
+          var cMinY = Math.min.apply(null, col.map(function(p){ return p.y; }));
+          var cMaxY = Math.max.apply(null, col.map(function(p){ return p.y + p.h; }));
+          var dy = (paper.h - (cMaxY - cMinY)) / 2 - cMinY;
+          col.forEach(function(p){ p.x += (colW - p.w) / 2; p.y += dy; });
+        });
+        var nMinX = Math.min.apply(null, pg.map(function(p){ return p.x; }));
+        var nMaxX = Math.max.apply(null, pg.map(function(p){ return p.x + p.w; }));
+        var dx = (paper.w - (nMaxX - nMinX)) / 2 - nMinX;
+        pg.forEach(function(p){ p.x += dx; });
+      } else {
+        // 横排：按行分组：每行内部垂直居中、整行水平居中；所有行作为整体垂直居中
+        var rows = {};
+        pg.forEach(function(p){ var k = Math.round(p.y*10)/10; (rows[k] = rows[k] || []).push(p); });
+        Object.keys(rows).forEach(function(k){
+          var row = rows[k];
+          var rowH = Math.max.apply(null, row.map(function(p){ return p.h; }));
+          var rMinX = Math.min.apply(null, row.map(function(p){ return p.x; }));
+          var rMaxX = Math.max.apply(null, row.map(function(p){ return p.x + p.w; }));
+          var dx = (paper.w - (rMaxX - rMinX)) / 2 - rMinX;
+          row.forEach(function(p){ p.y += (rowH - p.h) / 2; p.x += dx; });
+        });
+        var nMinY = Math.min.apply(null, pg.map(function(p){ return p.y; }));
+        var nMaxY = Math.max.apply(null, pg.map(function(p){ return p.y + p.h; }));
+        var dy2 = (paper.h - (nMaxY - nMinY)) / 2 - nMinY;
+        pg.forEach(function(p){ p.y += dy2; });
+      }
+    });
+  }
+  manual.forEach(function(it){
+    var s = itemSize(it);
+    var pg = Math.min(it.page || 0, pages.length - 1);
+    while (pages.length <= (it.page||0)) newPage();
+    pages[it.page||0].push({ it: it, x: it.x||st.margin, y: it.y||st.margin, w: s.w, h: s.h });
+  });
+  return { pages: pages, paper: paper };
+}
+
+/* ---------------- 渲染 ---------------- */
+var sheetsWrap = $('sheetsWrap');
+function scaleFor(paper){
+  var wrapW = Math.min(sheetsWrap.clientWidth || 700, 860);
+  var base = wrapW / paper.w;
+  return base * state.zoom;
+}
+function render(){
+  renderList(); renderTotals();
+  var res = layoutPages(), paper = res.paper, pages = res.pages;
+  var sc = scaleFor(paper);
+  sheetsWrap.innerHTML = '';
+  var hasAny = visibleItems().length > 0;
+  if (!hasAny){
+    sheetsWrap.innerHTML = state.mode === 'inv'
+      ? '<div class="no-page">发票拼排的纸面是空的。<br>从左侧上传发票图片或 PDF 后排版；证件拼排里的内容不会显示在这里。</div>'
+      : '<div class="no-page">证件拼排的纸面是空的。<br>从左侧上传证件文件，或点「拍摄证件」拍照加入后排版；发票拼排里的内容不会显示在这里。</div>';
+  }
+  pages.forEach(function(items, pi){
+    if (!hasAny) return;
+    var holder = document.createElement('div'); holder.className = 'sheet-holder';
+    var tag = document.createElement('div'); tag.className = 'sheet-tag';
+    tag.textContent = '第 ' + (pi+1) + ' 页 / 共 ' + pages.length + ' 页 · ' + paper.w + '×' + paper.h + 'mm';
+    var sheet = document.createElement('div'); sheet.className = 'sheet';
+    sheet.style.width = (paper.w*sc) + 'px'; sheet.style.height = (paper.h*sc) + 'px';
+    sheet.style.backgroundSize = (10*sc) + 'px ' + (10*sc) + 'px';
+    sheet.dataset.page = pi;
+    items.forEach(function(p, zi){
+      var el = document.createElement('div');
+      el.className = 'sheet-item' + (p.it.kind==='text' ? ' text-item' : '') + (state.mode!=='inv' ? ' draggable' : '');
+      if (state.selectedId === p.it.id) el.classList.add('selected');
+      if (state.mode === 'inv' && $('optBorder').checked) el.classList.add('hasbord');
+      el.style.left = (p.x*sc)+'px'; el.style.top = (p.y*sc)+'px';
+      el.style.width = (p.w*sc)+'px'; el.style.height = (p.h*sc)+'px';
+      el.style.zIndex = zi + 1;
+      el.dataset.id = p.it.id;
+      if (p.it.kind === 'text'){
+        el.textContent = p.it.text;
+        el.style.fontSize = ((p.it.size||5)*sc)+'px';
+        el.style.color = p.it.color || '#111';
+        el.style.transform = 'rotate(' + (p.it.rot||0) + 'deg)';
+      } else {
+        var img = document.createElement('img');
+        img.src = p.it.src; img.alt = p.it.name || '';
+        var fit = state.mode === 'inv' ? $('fitMode').value : 'fill';
+        img.style.objectFit = fit === 'fill' ? 'fill' : (fit === 'cover' ? 'cover' : 'contain');
+        var effRot = state.mode === 'inv' ? invEffRot(p.it) : (p.it.rot||0);
+        if (state.mode === 'inv' && (effRot % 180 !== 0)){
+          /* 竖放：图片框宽高互换后再旋转90°/270°，旋转后外框正好落回格子内，不溢出、不被裁 */
+          img.style.width = (p.h*sc) + 'px'; img.style.height = (p.w*sc) + 'px';
+          img.style.position = 'absolute';
+          img.style.left = ((p.w - p.h)*sc/2) + 'px'; img.style.top = ((p.h - p.w)*sc/2) + 'px';
+          img.style.transform = 'rotate(' + effRot + 'deg)';
+        } else if (effRot) img.style.transform = 'rotate(' + effRot + 'deg)';
+        el.appendChild(img);
+        var bd = document.createElement('div'); bd.className = 'bord'; el.appendChild(bd);
+      }
+      sheet.appendChild(el);
+    });
+    // 裁切线（发票网格）
+    if (state.mode === 'inv' && $('optCut').checked && items.length){
+      var lay = invLayout(), st = settings();
+      var cellW = (paper.w - st.margin*2 - st.gap*(lay[0]-1)) / lay[0];
+      var cellH = (paper.h - st.margin*2 - st.gap*(lay[1]-1)) / lay[1];
+      for (var c = 1; c < lay[0]; c++){
+        var v = document.createElement('div'); v.className = 'cut-v';
+        v.style.left = ((st.margin + c*cellW + (c-0.5)*st.gap) * sc) + 'px'; sheet.appendChild(v);
+      }
+      for (var r = 1; r < lay[1]; r++){
+        var hh = document.createElement('div'); hh.className = 'cut-h';
+        hh.style.top = ((st.margin + r*cellH + (r-0.5)*st.gap) * sc) + 'px'; sheet.appendChild(hh);
+      }
+    }
+    if (state.mode === 'inv' && $('optPageNum').checked){
+      var pn = document.createElement('div'); pn.className = 'pagenum';
+      pn.textContent = '第 ' + (pi+1) + ' 页 / 共 ' + pages.length + ' 页'; sheet.appendChild(pn);
+    }
+    // 水印
+    if (state.wm.text){
+      var wm = document.createElement('div'); wm.className = 'wm-layer';
+      var stepX = state.wm.space * sc / 3.78, stepY = state.wm.space * sc / 3.78 * 0.8;
+      for (var wy = -40; wy < paper.h*sc + 60; wy += stepY){
+        for (var wx = -60; wx < paper.w*sc + 80; wx += stepX){
+          var s = document.createElement('span');
+          s.textContent = state.wm.text;
+          s.style.left = wx+'px'; s.style.top = wy+'px';
+          s.style.fontSize = (state.wm.size * sc / 3.78 * 1.6) + 'px';
+          s.style.color = state.wm.color;
+          s.style.opacity = state.wm.opacity / 100;
+          s.style.transform = 'rotate(' + state.wm.angle + 'deg)';
+          wm.appendChild(s);
+        }
+      }
+      sheet.appendChild(wm);
+    }
+    holder.appendChild(tag); holder.appendChild(sheet);
+    sheetsWrap.appendChild(holder);
+  });
+  $('zoomLabel').textContent = Math.round(state.zoom*100) + '%';
+  $('stageTitle').textContent = state.mode === 'inv' ? '发票拼版预览' : 'A4 拼版预览（拖动图片调整位置）';
+  if (window.lucide) lucide.createIcons();
+}
+
+/* ---------------- 列表 ---------------- */
+function renderList(){
+  var wrap = $('itemList'); wrap.innerHTML = '';
+  var vis = visibleItems();
+  $('listCount').textContent = vis.length + ' 项 · 可多页';
+  if (!vis.length){
+    wrap.innerHTML = state.mode === 'inv'
+      ? '<div class="empty-tip">发票拼排还没有发票。从左侧上传发票图片或 PDF 加入；这里只显示发票。</div>'
+      : '<div class="empty-tip">证件拼排还没有内容。上传证件文件、点「拍摄证件」拍照，或加文字说明；这里只显示证件和文字。</div>';
+    return;
+  }
+  vis.forEach(function(it, i){
+    var card = document.createElement('div');
+    card.dataset.id = it.id;
+    card.className = 'card' + (state.selectedId === it.id ? ' sel' : '');
+    var head = document.createElement('div'); head.className = 'chead';
+    if (it.kind === 'text'){
+      var th = document.createElement('div'); th.className = 'thumb text-thumb'; th.textContent = it.text; head.appendChild(th);
+    } else {
+      var im = document.createElement('img'); im.className = 'thumb'; im.src = it.src; im.alt = it.name||''; head.appendChild(im);
+    }
+    var mid = document.createElement('div'); mid.style.cssText = 'flex:1;min-width:0';
+    var nm = document.createElement('div'); nm.className = 'cname';
+    nm.textContent = (i+1) + '. ' + (it.kind==='text' ? '文字说明' : it.name);
+    var meta = document.createElement('div'); meta.className = 'cmeta';
+    if (it.kind === 'inv') meta.textContent = '价税合计 ' + money((+it.net||0) + (+it.tax||0)) + (it.date ? ' · ' + it.date : '') + (it.crop ? ' · 已裁剪' : '');
+    else if (it.kind === 'doc'){ var d = docSize(); meta.textContent = '按 ' + d.w.toFixed(1) + '×' + d.h.toFixed(1) + 'mm 打印' + (it.rot ? ' · 旋转 ' + it.rot + '°' : '') + (it.crop ? ' · 已裁剪' : ''); }
+    else meta.textContent = '字号 ' + (it.size||5) + 'mm';
+    mid.appendChild(nm); mid.appendChild(meta); head.appendChild(mid);
+    var tag = document.createElement('span'); tag.className = 'kindtag' + (it.kind==='inv' ? ' inv' : '');
+    tag.textContent = it.kind==='doc' ? '证件' : (it.kind==='inv' ? '发票' : '文字');
+    head.appendChild(tag);
+    head.addEventListener('click', function(){ selectItem(it.id, true); });
+    card.appendChild(head);
+
+    if (it.kind === 'inv'){
+      var ost = document.createElement('div');
+      ost.className = 'ocr-status ' + (it.ocrStatus || '');
+      ost.textContent = it.ocrMsg || '上传后自动识别开票日期、销售方和金额，识别结果可直接修改。';
+      ost.style.display = it.ocrStatus ? '' : 'none';
+      if (it.ocrStatus) card.appendChild(ost);
+      var grid = document.createElement('div'); grid.className = 'amtgrid';
+      grid.innerHTML =
+        '<div class="field">发票名称<input type="text" data-f="invName" placeholder="如：办公用品" value="' + esc(it.invName||'') + '"></div>' +
+        '<div class="field">开票日期<input type="date" data-f="date" value="' + esc(it.date||'') + '"></div>' +
+        '<div class="field" style="grid-column:1/-1">销售方<input type="text" data-f="seller" placeholder="销售方名称" value="' + esc(it.seller||'') + '"></div>' +
+        '<div class="field">金额（不含税）<input type="number" data-f="net" step="0.01" min="0" placeholder="0.00" value="' + (it.net===''||it.net==null?'':it.net) + '"></div>' +
+        '<div class="field">税额<input type="number" data-f="tax" step="0.01" min="0" placeholder="0.00" value="' + (it.tax===''||it.tax==null?'':it.tax) + '"></div>';
+      grid.querySelectorAll('input').forEach(function(inp){
+        inp.addEventListener('input', function(){
+          var f = inp.dataset.f;
+          it[f] = (f==='net'||f==='tax') ? inp.value : inp.value;
+          renderTotals(); renderSummary();
+          var m = card.querySelector('.cmeta');
+          if (m) m.textContent = '价税合计 ' + money((+it.net||0) + (+it.tax||0)) + (it.date ? ' · ' + it.date : '');
+        });
+        inp.addEventListener('click', function(e){ e.stopPropagation(); });
+      });
+      card.appendChild(grid);
+    }
+    var ops = document.createElement('div'); ops.className = 'ops';
+    var opList = it.kind === 'text'
+      ? [['rot','旋转'],['up','放大'],['down','缩小'],['dup','复制'],['del','删除']]
+      : (it.kind === 'inv'
+        ? [['crop','裁剪'],['ocr','重新识别'],['rot','旋转'],['up','放大'],['down','缩小'],['dup','复制'],['del','删除']]
+        : [['crop','裁剪'],['rot','旋转'],['up','放大'],['down','缩小'],['dup','复制'],['del','删除']]);
+    opList.forEach(function(op){
+      var b = document.createElement('button'); b.className = 'btn small' + (op[0]==='del' ? ' danger' : '');
+      b.textContent = op[1];
+      b.addEventListener('click', function(e){ e.stopPropagation(); itemAction(it.id, op[0]); });
+      ops.appendChild(b);
+    });
+    card.appendChild(ops);
+    wrap.appendChild(card);
+  });
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function invItems(){ return state.items.filter(function(it){ return it.kind === 'inv'; }); }
+function totals(){ var n=0,t=0; invItems().forEach(function(it){ n += +it.net||0; t += +it.tax||0; }); return { n:n, t:t, g:n+t }; }
+function renderTotals(){
+  /* 顶部合计栏已按要求去掉：此处不再更新顶部元素。报销汇总表的合计仍由 totals() 与 renderSummary() 计算并保留。 */
+}
+
+/* ---------------- 选中与操作 ---------------- */
+var itemBar = $('itemBar');
+function selectItem(id, scrollBar){
+  state.selectedId = id;
+  document.querySelectorAll('.sheet-item').forEach(function(el){ el.classList.toggle('selected', +el.dataset.id === id); });
+  document.querySelectorAll('#itemList .card').forEach(function(c){ c.classList.toggle('sel', +c.dataset.id === id); });
+  var el = document.querySelector('.sheet-item[data-id="' + id + '"]');
+  if (el && scrollBar !== false){
+    var r = el.getBoundingClientRect();
+    var selIt = findItem(id);
+    var cropBtn = itemBar.querySelector('[data-act="crop"]');
+    if (cropBtn) cropBtn.style.display = (selIt && selIt.kind === 'text') ? 'none' : '';
+    itemBar.style.display = 'flex';
+    var bw = itemBar.offsetWidth || 340;
+    itemBar.style.left = Math.max(6, Math.min(window.innerWidth - bw - 6, r.left + r.width/2 - bw/2)) + 'px';
+    itemBar.style.top = Math.max(6, r.top - 46) + 'px';
+  } else if (!el) itemBar.style.display = 'none';
+}
+function findItem(id){ return state.items.find(function(it){ return it.id === id; }); }
+function itemAction(id, act){
+  var it = findItem(id); if (!it) return;
+  if (act === 'del'){ state.items = state.items.filter(function(x){ return x.id !== id; }); if (state.selectedId === id){ state.selectedId = null; itemBar.style.display='none'; } }
+  else if (act === 'rot'){ it.rot = ((it.rot||0) + 90) % 360; }
+  else if (act === 'up'){
+    if (it.kind === 'text'){ it.size = Math.min(20, Math.round((it.size||5) * 1.15 * 100) / 100); it.scale = 1; }
+    else it.scale = Math.min(2.5, (it.scale||1) * 1.15);
+  }
+  else if (act === 'down'){
+    if (it.kind === 'text'){ it.size = Math.max(2, Math.round((it.size||5) / 1.15 * 100) / 100); it.scale = 1; }
+    else it.scale = Math.max(0.3, (it.scale||1) / 1.15);
+  }
+  else if (act === 'front'){ state.items = state.items.filter(function(x){ return x.id !== id; }); state.items.push(it); }
+  else if (act === 'dup'){
+    var cp = JSON.parse(JSON.stringify(it)); cp.id = ++uid; cp.name = (cp.name||'副本') + ' 副本'; cp.manual = false; cp.bucket = bucketOf(it);
+    state.items.push(cp);
+  }
+  else if (act === 'edit'){ openTextModal(it); return; }
+  else if (act === 'ocr'){ enqueueOcr(it, it.pdfText || ''); render(); toast('开始重新识别这张发票，识别在本机进行'); return; }
+  else if (act === 'crop'){ openCropModal(it); return; }
+  render();
+}
+itemBar.querySelectorAll('button').forEach(function(b){
+  b.addEventListener('click', function(){ if (state.selectedId != null) itemAction(state.selectedId, b.dataset.act); });
+});
+document.addEventListener('pointerdown', function(e){
+  if (!itemBar.contains(e.target) && !e.target.closest('.sheet-item') && !e.target.closest('#itemList')) itemBar.style.display = 'none';
+});
+
+/* ---------------- 裁剪（基于原图框选，确认才生效，取消不动原图） ---------------- */
+var cropId = null;
+var cropRect = { x:0, y:0, w:1, h:1 }; // 相对原图的比例坐标 0~1
+var cropDrag = null;
+var cropImgEl = $('cropImg'), cropStage = $('cropStage'), cropRectEl = $('cropRect');
+function clamp01(v){ return Math.max(0, Math.min(1, v)); }
+function updateCropRect(){
+  var w = cropImgEl.clientWidth, h = cropImgEl.clientHeight;
+  if (!w || !h) return;
+  cropRectEl.style.left = (cropRect.x * w) + 'px';
+  cropRectEl.style.top = (cropRect.y * h) + 'px';
+  cropRectEl.style.width = (cropRect.w * w) + 'px';
+  cropRectEl.style.height = (cropRect.h * h) + 'px';
+  var nw = cropImgEl.naturalWidth || 0, nh = cropImgEl.naturalHeight || 0;
+  $('cropInfo').textContent = nw ? ('选区：原图 ' + Math.round(cropRect.w * nw) + ' × ' + Math.round(cropRect.h * nh) + ' 像素（原图 ' + nw + ' × ' + nh + '）') : '选区：—';
+}
+function openCropModal(it){
+  if (!it || it.kind === 'text'){ toast('文字说明不能裁剪'); return; }
+  if (!it.origSrc) it.origSrc = it.src;
+  cropId = it.id;
+  cropRect = it.crop ? { x: it.crop.x, y: it.crop.y, w: it.crop.w, h: it.crop.h } : { x:0, y:0, w:1, h:1 };
+  $('btnCropRestore').style.display = it.crop ? '' : 'none';
+  $('cropModal').classList.add('show');
+  var inited = false;
+  function init(){ if (inited) return; inited = true; requestAnimationFrame(updateCropRect); }
+  cropImgEl.onload = init;
+  cropImgEl.src = it.origSrc;
+  if (cropImgEl.complete && cropImgEl.naturalWidth) init();
+}
+function cropPos(e){
+  var r = cropImgEl.getBoundingClientRect();
+  return { x: clamp01((e.clientX - r.left) / Math.max(1, r.width)), y: clamp01((e.clientY - r.top) / Math.max(1, r.height)) };
+}
+cropStage.addEventListener('pointerdown', function(e){
+  if (cropId == null) return;
+  var p = cropPos(e);
+  var handle = (e.target && e.target.dataset) ? e.target.dataset.h : null;
+  var inside = p.x >= cropRect.x && p.x <= cropRect.x + cropRect.w && p.y >= cropRect.y && p.y <= cropRect.y + cropRect.h;
+  if (handle) cropDrag = { mode:'resize', h: handle, start: { x: cropRect.x, y: cropRect.y, w: cropRect.w, h: cropRect.h } };
+  else if (inside) cropDrag = { mode:'move', dx: p.x - cropRect.x, dy: p.y - cropRect.y };
+  else cropDrag = { mode:'new', ax: p.x, ay: p.y, prev: { x: cropRect.x, y: cropRect.y, w: cropRect.w, h: cropRect.h } };
+  cropStage.setPointerCapture && cropStage.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+cropStage.addEventListener('pointermove', function(e){
+  if (!cropDrag) return;
+  var p = cropPos(e);
+  if (cropDrag.mode === 'move'){
+    cropRect.x = Math.max(0, Math.min(1 - cropRect.w, p.x - cropDrag.dx));
+    cropRect.y = Math.max(0, Math.min(1 - cropRect.h, p.y - cropDrag.dy));
+  } else if (cropDrag.mode === 'new'){
+    cropRect.x = Math.min(cropDrag.ax, p.x); cropRect.y = Math.min(cropDrag.ay, p.y);
+    cropRect.w = Math.abs(p.x - cropDrag.ax); cropRect.h = Math.abs(p.y - cropDrag.ay);
+  } else if (cropDrag.mode === 'resize'){
+    var s = cropDrag.start, MIN = 0.04;
+    var x1 = s.x, y1 = s.y, x2 = s.x + s.w, y2 = s.y + s.h;
+    if (cropDrag.h.indexOf('w') >= 0) x1 = Math.min(p.x, x2 - MIN);
+    if (cropDrag.h.indexOf('e') >= 0) x2 = Math.max(p.x, x1 + MIN);
+    if (cropDrag.h.indexOf('n') >= 0) y1 = Math.min(p.y, y2 - MIN);
+    if (cropDrag.h.indexOf('s') >= 0) y2 = Math.max(p.y, y1 + MIN);
+    cropRect.x = clamp01(x1); cropRect.y = clamp01(y1);
+    cropRect.w = clamp01(x2) - cropRect.x; cropRect.h = clamp01(y2) - cropRect.y;
+  }
+  updateCropRect();
+});
+cropStage.addEventListener('pointerup', function(){
+  if (cropDrag && cropDrag.mode === 'new' && (cropRect.w < 0.02 || cropRect.h < 0.02)) cropRect = cropDrag.prev; // 误点不改选区
+  cropDrag = null; updateCropRect();
+});
+$('btnCropFull').addEventListener('click', function(){ cropRect = { x:0, y:0, w:1, h:1 }; updateCropRect(); });
+$('btnCropRestore').addEventListener('click', function(){
+  var it = findItem(cropId); if (!it) return;
+  it.src = it.origSrc; it.crop = null;
+  $('cropModal').classList.remove('show'); cropId = null;
+  render(); toast('已恢复原图');
+});
+$('btnCropOk').addEventListener('click', function(){
+  var it = findItem(cropId); if (!it){ $('cropModal').classList.remove('show'); return; }
+  if (cropRect.w < 0.05 || cropRect.h < 0.05){ toast('裁剪区域太小，请重新框选'); return; }
+  var full = cropRect.x <= 0.001 && cropRect.y <= 0.001 && cropRect.w >= 0.999 && cropRect.h >= 0.999;
+  if (full){
+    it.src = it.origSrc; it.crop = null;
+    $('cropModal').classList.remove('show'); cropId = null;
+    render(); toast('选区为全图，已恢复完整图片'); return;
+  }
+  var im = new Image();
+  im.onload = function(){
+    var sx = Math.round(cropRect.x * im.naturalWidth), sy = Math.round(cropRect.y * im.naturalHeight);
+    var sw = Math.max(1, Math.round(cropRect.w * im.naturalWidth)), sh = Math.max(1, Math.round(cropRect.h * im.naturalHeight));
+    var cv = document.createElement('canvas'); cv.width = sw; cv.height = sh;
+    cv.getContext('2d').drawImage(im, sx, sy, sw, sh, 0, 0, sw, sh);
+    var isJpg = (it.origSrc || '').indexOf('data:image/jpeg') === 0;
+    it.src = isJpg ? cv.toDataURL('image/jpeg', 0.92) : cv.toDataURL('image/png');
+    it.crop = { x: cropRect.x, y: cropRect.y, w: cropRect.w, h: cropRect.h };
+    $('cropModal').classList.remove('show'); cropId = null;
+    render(); toast('裁剪已应用，仍按原尺寸排版打印');
+  };
+  im.onerror = function(){ toast('原图读取失败，裁剪未生效'); };
+  im.src = it.origSrc;
+});
+
+/* ---------------- 拖动 ---------------- */
+var drag = null;
+sheetsWrap.addEventListener('pointerdown', function(e){
+  var el = e.target.closest('.sheet-item'); if (!el) return;
+  var id = +el.dataset.id; selectItem(id);
+  if (state.mode === 'inv') return;
+  var sheet = el.closest('.sheet');
+  var paper = paperDims();
+  var sc = sheet.clientWidth / paper.w;
+  var it = findItem(id); if (!it) return;
+  // 按下时只选中并记录起始布局坐标，不立即转手动：
+  // 纯单击若在按下时就把该项固化为手动项，它会退出自动居中组，
+  // 松开重排时其余自动项会按更少的数量重新居中（如第二张上移）。
+  // 转手动推迟到 pointermove 里拖动超过阈值后再做。
+  var startOx = it.x || 0, startOy = it.y || 0, startPage = it.page || 0;
+  if (!it.manual){
+    var res = layoutPages();
+    res.pages.forEach(function(pg, pi){ pg.forEach(function(p){ if (p.it.id === id){ startOx = p.x; startOy = p.y; startPage = pi; } }); });
+  }
+  drag = { id: id, sheet: sheet, sc: sc, startX: e.clientX, startY: e.clientY, ox: startOx, oy: startOy, page: startPage, active: false, wasManual: !!it.manual };
+  el.setPointerCapture && e.target.setPointerCapture && 0;
+  e.preventDefault();
+});
+window.addEventListener('pointermove', function(e){
+  if (!drag) return;
+  var it = findItem(drag.id); if (!it) return;
+  var dxPx = e.clientX - drag.startX, dyPx = e.clientY - drag.startY;
+  if (!drag.active){
+    // 拖动阈值：移动不足约3px视为单击，不转手动、不改坐标、不触发重排
+    if (Math.sqrt(dxPx*dxPx + dyPx*dyPx) < 3) return;
+    drag.active = true;
+    // 首次超过阈值时才把当前居中后的坐标固化为手动坐标
+    it.x = drag.ox; it.y = drag.oy; it.page = drag.page; it.manual = true;
+  }
+  it.x = Math.round((drag.ox + dxPx/drag.sc) * 10) / 10;
+  it.y = Math.round((drag.oy + dyPx/drag.sc) * 10) / 10;
+  var el = document.querySelector('.sheet-item[data-id="' + drag.id + '"]');
+  if (el){ el.style.left = (it.x*drag.sc)+'px'; el.style.top = (it.y*drag.sc)+'px'; }
+});
+function endDrag(){
+  if (!drag) return;
+  var wasActive = drag.active;
+  drag = null;
+  // 纯单击没有真正拖动，不重排，避免其余自动项被重新居中
+  if (wasActive) render();
+}
+window.addEventListener('pointerup', endDrag);
+window.addEventListener('pointercancel', endDrag);
+
+/* ---------------- 文件处理 ---------------- */
+function addItem(partial){
+  var it = Object.assign({ id: ++uid, kind:'doc', src:'', origSrc:'', crop:null, name:'', x:0, y:0, page:0, manual:false, rot:0, scale:1,
+    text:'', size:5, color:'#111111', invName:'', date:'', seller:'', net:'', tax:'', bucket:'', ocrStatus:'', ocrMsg:'', pdfText:'' }, partial);
+  /* 按类型归入各自模式：发票归发票拼排，证件与文字归证件拼排 */
+  it.bucket = it.kind === 'inv' ? 'inv' : 'doc';
+  if (!it.origSrc) it.origSrc = it.src; // 裁剪始终基于原图，取消不改动、重裁可回到原图
+  state.items.push(it); return it;
+}
+function kindForFile(){ return state.mode === 'inv' ? 'inv' : 'doc'; }
+
+/* ---------------- 发票自动识别（全程本地：PDF读文字层，图片用本机OCR，图片不上传服务器） ---------------- */
+function pad2(n){ return (n < 10 ? '0' : '') + n; }
+function cleanSellerCand(cand){
+  if (!cand) return '';
+  var stops = ['统一社会信用代码','纳税人识别号','地址','电话','开户行','银行账号','账号','项目名称','规格型号','开票人','备注'];
+  var cut = cand.length;
+  stops.forEach(function(s){ var i = cand.indexOf(s); if (i > 0 && i < cut) cut = i; });
+  cand = cand.slice(0, cut).replace(/^[:：,，、\s]+/, '').replace(/[:：,，、\s]+$/, '');
+  var suffixes = ['有限责任公司','股份有限公司','有限公司','公司','合作社','经营部','商行','商店','超市','酒店','饭店','餐厅','药店','服务部','工作室','门市部','中心','厂','店'];
+  var end = -1;
+  suffixes.forEach(function(suf){ var i = cand.indexOf(suf); if (i >= 2){ var e = i + suf.length; if (end < 0 || e < end) end = e; } });
+  if (end > 0) cand = cand.slice(0, end);
+  if (cand.length < 4 || cand.length > 50) return '';
+  if (!/[一-龥]/.test(cand)) return '';
+  if (/(个人|购买方|销售方信息|销方|购方)/.test(cand) && !/(公司|店|厂|中心|部|行|社)/.test(cand)) return '';
+  return cand;
+}
+function amountsIn(str){
+  var out = [], re = /[¥￥]?\s*(\d{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2})/g, m;
+  while ((m = re.exec(str || '')) !== null){ var v = parseFloat(m[1].replace(/,/g, '')); if (isFinite(v)) out.push(v); }
+  return out;
+}
+function parseInvoiceText(raw){
+  var result = { date:'', seller:'', net:'', tax:'', grand:'', found:0 };
+  if (!raw) return result;
+  var compact = String(raw).replace(/\s+/g, '');
+  var dm = compact.match(/开票日期[:：]?(\d{4})年(\d{1,2})月(\d{1,2})日/) || compact.match(/开票日期[:：]?(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/);
+  if (dm) result.date = dm[1] + '-' + pad2(+dm[2]) + '-' + pad2(+dm[3]);
+  /* 销售方：优先从“销售方”段内的名称提取，其次取全文第二个“名称”（第一个通常是购买方） */
+  var seller = '';
+  var sIdx = compact.indexOf('销售方');
+  if (sIdx >= 0){
+    var seg = compact.slice(sIdx, sIdx + 340);
+    var nm = seg.match(/名称[:：]?(.{4,80})/);
+    if (nm) seller = cleanSellerCand(nm[1]);
+  }
+  if (!seller){
+    var idxs = [], pos = 0;
+    while ((pos = compact.indexOf('名称', pos)) >= 0){ idxs.push(pos); pos += 2; }
+    var order = idxs.length >= 2 ? [1, 0] : [0];
+    for (var oi = 0; oi < order.length && !seller; oi++){
+      if (idxs[order[oi]] == null) continue;
+      var candTxt = compact.slice(idxs[order[oi]] + 2).replace(/^[:：]?/, '');
+      seller = cleanSellerCand(candTxt.slice(0, 80));
+    }
+  }
+  result.seller = seller;
+  /* 价税合计（小写） */
+  var grand = null;
+  var gm = compact.match(/价税合计[\s\S]{0,50}?小写[^\d¥￥]{0,12}[¥￥]?(\d[\d,]*\.\d{2})/) || compact.match(/小写[^\d¥￥]{0,12}[¥￥](\d[\d,]*\.\d{2})/) || compact.match(/价税合计[^\d¥￥]{0,20}[¥￥](\d[\d,]*\.\d{2})/);
+  if (gm) grand = parseFloat(gm[1].replace(/,/g, ''));
+  /* 合计行：不含税金额 + 税额（排除“价税合计”） */
+  var net = null, tax = null;
+  var lines = String(raw).split(/\n/);
+  for (var li = 0; li < lines.length && (net == null || tax == null); li++){
+    var ln = lines[li].replace(/\s+/g, '');
+    if (ln.indexOf('合计') >= 0 && ln.indexOf('价税合计') < 0){
+      var la = amountsIn(ln);
+      if (la.length >= 2){ net = la[0]; tax = la[1]; }
+    }
+  }
+  if (net == null || tax == null){
+    var hre = /合计/g, hm;
+    while ((hm = hre.exec(compact)) !== null){
+      if (compact.slice(Math.max(0, hm.index - 2), hm.index).indexOf('价税') >= 0) continue;
+      var sub = amountsIn(compact.slice(hm.index, hm.index + 60));
+      if (sub.length >= 2){ net = sub[0]; tax = sub[1]; break; }
+    }
+  }
+  /* 兜底：找出一对金额相加等于价税合计 */
+  if (grand != null && (net == null || tax == null)){
+    var all = amountsIn(compact), uniq = [];
+    all.forEach(function(v){ if (Math.abs(v - grand) > 0.005 && uniq.indexOf(v) < 0) uniq.push(v); });
+    outer:
+    for (var a = 0; a < uniq.length; a++) for (var b = 0; b < uniq.length; b++){
+      if (Math.abs(uniq[a] + uniq[b] - grand) < 0.02){ net = uniq[a]; tax = uniq[b]; break outer; }
+    }
+  }
+  if (grand != null && net != null && tax == null) tax = Math.round((grand - net) * 100) / 100;
+  if (grand != null && tax != null && net == null) net = Math.round((grand - tax) * 100) / 100;
+  if (grand == null && net != null && tax != null) grand = Math.round((net + tax) * 100) / 100;
+  if (net != null) result.net = net.toFixed(2);
+  if (tax != null) result.tax = tax.toFixed(2);
+  if (grand != null) result.grand = grand.toFixed(2);
+  result.found = (result.date ? 1 : 0) + (result.seller ? 1 : 0) + (result.net !== '' ? 1 : 0) + (result.tax !== '' ? 1 : 0);
+  return result;
+}
+function mergeParsed(a, b){
+  if (!b) return a;
+  if (!a) return b;
+  ['date','seller','net','tax','grand'].forEach(function(k){ if (!a[k] && b[k]) a[k] = b[k]; });
+  a.found = (a.date ? 1 : 0) + (a.seller ? 1 : 0) + (a.net !== '' && a.net != null ? 1 : 0) + (a.tax !== '' && a.tax != null ? 1 : 0);
+  return a;
+}
+window.__parseInvoiceText = parseInvoiceText;
+var ocrQueue = [], ocrBusy = false, ocrScriptPromise = null;
+function loadOcrScript(){
+  if (window.Tesseract) return Promise.resolve();
+  if (ocrScriptPromise) return ocrScriptPromise;
+  ocrScriptPromise = new Promise(function(res, rej){
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js';
+    s.onload = function(){ res(); };
+    s.onerror = function(){ rej(new Error('ocr-load-failed')); };
+    document.head.appendChild(s);
+  });
+  return ocrScriptPromise;
+}
+function setOcrStatus(it, status, msg){
+  it.ocrStatus = status; it.ocrMsg = msg;
+  var card = document.querySelector('#itemList .card[data-id="' + it.id + '"]');
+  if (card){ var n = card.querySelector('.ocr-status'); if (n){ n.className = 'ocr-status ' + status; n.textContent = msg; n.style.display = ''; } }
+}
+function enqueueOcr(it, pdfText){
+  if (!it || it.kind !== 'inv') return;
+  if (pdfText) it.pdfText = pdfText;
+  it.ocrStatus = 'recognizing';
+  it.ocrMsg = '识别中：正在本地识别开票日期、销售方和金额…（图片不上传服务器）';
+  ocrQueue.push({ it: it, pdfText: pdfText || it.pdfText || '' });
+  processOcrQueue();
+}
+function processOcrQueue(){
+  if (ocrBusy) return;
+  var job = ocrQueue.shift();
+  if (!job) return;
+  ocrBusy = true;
+  recognizeInvoice(job.it, job.pdfText).then(function(){ ocrBusy = false; processOcrQueue(); }, function(){ ocrBusy = false; processOcrQueue(); });
+}
+function recognizeInvoice(it, pdfText){
+  setOcrStatus(it, 'recognizing', '识别中：正在本地识别开票日期、销售方和金额…（图片不上传服务器）');
+  var parsed = pdfText ? parseInvoiceText(pdfText) : null;
+  function finish(p){
+    var found = p ? p.found : 0;
+    if (p){
+      /* 只填空缺：识别期间用户已手动改过的内容不覆盖 */
+      if (p.date && !it.date) it.date = p.date;
+      if (p.seller && !it.seller) it.seller = p.seller;
+      if (p.net !== '' && p.net != null && (it.net === '' || it.net == null)) it.net = p.net;
+      if (p.tax !== '' && p.tax != null && (it.tax === '' || it.tax == null)) it.tax = p.tax;
+    }
+    if (found >= 4) setOcrStatus(it, 'ok', '已自动识别并填入开票日期、销售方、不含税金额、税额和价税合计；如有误可直接在下方修改，合计会自动同步。');
+    else if (found >= 1) setOcrStatus(it, 'partial', '已自动识别部分内容（' + found + '/4项），未识别到的请手动补填；每行都可直接修改，合计会自动同步。');
+    else { setOcrStatus(it, 'fail', '自动识别失败：未能读出日期、销售方和金额，请在下方手动填写。'); toast('有一张发票自动识别失败，请手动填写日期、销售方和金额'); }
+    render();
+  }
+  if (parsed && parsed.found >= 4){ finish(parsed); return Promise.resolve(); }
+  return loadOcrScript().then(function(){
+    return window.Tesseract.recognize(it.src, 'chi_sim+eng', {
+      logger: function(m){
+        if (m && m.status === 'recognizing text') setOcrStatus(it, 'recognizing', '识别中：' + Math.round((m.progress || 0) * 100) + '% · 正在本地识别开票日期、销售方和金额（图片不上传服务器）');
+      }
+    });
+  }).then(function(res){
+    var ocrText = (res && res.data && res.data.text) || '';
+    finish(mergeParsed(parsed, parseInvoiceText(ocrText)));
+  }).catch(function(){
+    if (parsed && parsed.found >= 1) finish(parsed);
+    else finish(null);
+  });
+}
+function pdfTextFromContent(tc){
+  var rows = {};
+  (tc.items || []).forEach(function(ti){
+    var y = ti.transform ? Math.round(ti.transform[5] / 4) * 4 : 0;
+    var x = ti.transform ? ti.transform[4] : 0;
+    (rows[y] = rows[y] || []).push({ x: x, s: ti.str || '' });
+  });
+  return Object.keys(rows).map(function(k){ return +k; }).sort(function(a, b){ return b - a; }).map(function(y){
+    return rows[y].sort(function(a, b){ return a.x - b.x; }).map(function(p){ return p.s; }).join('');
+  }).join('\n');
+}
+function handleFiles(files){
+  var list = Array.prototype.slice.call(files||[]);
+  if (!list.length) return;
+  var pending = list.length;
+  function done(){ if (--pending === 0){ render(); toast('已加入 ' + list.length + ' 个文件'); } }
+  list.forEach(function(f){
+    if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)){
+      if (state.mode === 'doc'){ toast('当前是证件拼排，只能加入证件；发票 PDF 请切换到发票拼排'); done(); return; }
+      if (!window.pdfjsLib){ toast('PDF 组件未加载完成，请稍后再试'); done(); return; }
+      f.arrayBuffer().then(function(buf){
+        return pdfjsLib.getDocument({ data: buf }).promise;
+      }).then(function(pdf){ return pdf.getPage(1); }).then(function(page){
+        var vp = page.getViewport({ scale: 2 });
+        var cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+        /* PDF优先读文字层提取日期/销售方/金额，文字层不够再对渲染图做本地OCR */
+        var textP = page.getTextContent ? page.getTextContent().then(function(tc){ return pdfTextFromContent(tc); }).catch(function(){ return ''; }) : Promise.resolve('');
+        var renderP = page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+        return Promise.all([textP, renderP]).then(function(rs){
+          var itPdf = addItem({ kind:'inv', src: cv.toDataURL('image/jpeg', 0.88), name: f.name, pdfText: rs[0] || '' });
+          enqueueOcr(itPdf, rs[0] || '');
+        });
+      }).catch(function(){ toast('PDF 读取失败：' + f.name); }).then(done);
+    } else if (/^image\//.test(f.type)){
+      var rd = new FileReader();
+      rd.onload = function(){ var added = addItem({ kind: kindForFile(), src: rd.result, name: f.name }); if (added.kind === 'inv') enqueueOcr(added, ''); done(); };
+      rd.onerror = done;
+      rd.readAsDataURL(f);
+    } else { toast('不支持的文件：' + f.name); done(); }
+  });
+}
+var dz = $('dropzone'), fi = $('fileInput');
+dz.addEventListener('click', function(){ fi.click(); });
+dz.addEventListener('keydown', function(e){ if (e.key==='Enter'||e.key===' '){ e.preventDefault(); fi.click(); } });
+fi.addEventListener('change', function(){ handleFiles(fi.files); fi.value=''; });
+['dragover','dragenter'].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.add('hover'); }); });
+['dragleave','drop'].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.remove('hover'); }); });
+dz.addEventListener('drop', function(e){ handleFiles(e.dataTransfer.files); });
+document.addEventListener('dragover', function(e){ e.preventDefault(); });
+document.addEventListener('drop', function(e){ e.preventDefault(); });
+
+/* ---------------- 拍摄（证件拼排专用）：getUserMedia 优先后置摄像头，不可用回退选文件 ---------------- */
+var cameraStream = null;
+var cameraVideo = $('cameraVideo'), cameraCanvas = $('cameraCanvas'), cameraModal = $('cameraModal'), cameraInput = $('cameraInput');
+function stopCamera(){
+  if (cameraStream){
+    try { cameraStream.getTracks().forEach(function(t){ t.stop(); }); } catch(e){}
+    cameraStream = null;
+  }
+  if (cameraVideo){ try { cameraVideo.pause(); } catch(e){} cameraVideo.srcObject = null; }
+}
+function closeCamera(){
+  stopCamera();
+  if (cameraModal) cameraModal.classList.remove('show');
+}
+function fallbackToFileCapture(reason){
+  closeCamera();
+  toast((reason ? reason + '；' : '') + '已改用选文件 / 系统相机，请选择或拍摄证件照片');
+  // 必须在用户手势链路附近触发；setTimeout 保留一次机会调起系统相机/文件选择
+  setTimeout(function(){ try { cameraInput.click(); } catch(e){} }, 60);
+}
+function openCamera(){
+  if (state.mode !== 'doc'){ toast('拍摄功能在证件拼排里使用，请先切换到证件拼排'); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    fallbackToFileCapture('当前环境不支持直接调用摄像头');
+    return;
+  }
+  $('cameraStatus').textContent = '正在打开摄像头…';
+  cameraModal.classList.add('show');
+  var constraints = { audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } };
+  navigator.mediaDevices.getUserMedia(constraints).then(function(stream){
+    // 若用户在等待期间已关掉弹窗，直接释放
+    if (!cameraModal.classList.contains('show')){ stream.getTracks().forEach(function(t){ t.stop(); }); return; }
+    cameraStream = stream;
+    cameraVideo.srcObject = stream;
+    var p = cameraVideo.play();
+    if (p && p.catch) p.catch(function(){});
+    var track = stream.getVideoTracks && stream.getVideoTracks()[0];
+    var label = track ? (track.label || '') : '';
+    $('cameraStatus').textContent = label ? ('已打开摄像头：' + label + ' · 对准证件后点「拍照」') : '已打开摄像头 · 对准证件后点「拍照」';
+    if (window.lucide) lucide.createIcons();
+  }).catch(function(err){
+    // 权限拒绝、无摄像头、安全上下文限制等统一回退
+    fallbackToFileCapture('摄像头打开失败（可能未授权或当前页面环境不允许）');
+  });
+}
+$('btnCamera').addEventListener('click', openCamera);
+$('btnCameraCancel').addEventListener('click', closeCamera);
+$('btnCameraClose').addEventListener('click', closeCamera);
+cameraModal.addEventListener('click', function(e){ if (e.target === cameraModal) closeCamera(); });
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && cameraModal.classList.contains('show')) closeCamera(); });
+$('btnShutter').addEventListener('click', function(){
+  if (!cameraStream || !cameraVideo.videoWidth || !cameraVideo.videoHeight){
+    toast('摄像头还没准备好，请稍等画面出现后再拍照');
+    return;
+  }
+  try {
+    cameraCanvas.width = cameraVideo.videoWidth;
+    cameraCanvas.height = cameraVideo.videoHeight;
+    var ctx = cameraCanvas.getContext('2d');
+    ctx.drawImage(cameraVideo, 0, 0, cameraCanvas.width, cameraCanvas.height);
+    var dataUrl = cameraCanvas.toDataURL('image/jpeg', 0.92);
+    var now = new Date();
+    var pad = function(n){ return (n < 10 ? '0' : '') + n; };
+    var stamp = now.getFullYear() + pad(now.getMonth()+1) + pad(now.getDate()) + '-' + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds());
+    addItem({ kind: 'doc', src: dataUrl, name: '拍摄证件-' + stamp + '.jpg' });
+    closeCamera();
+    render();
+    toast('拍摄完成，已加入证件列表并排版，可继续拖动、裁剪或旋转');
+  } catch(err){
+    toast('拍照失败，请重试；也可以取消后改用上传文件');
+  }
+});
+cameraInput.addEventListener('change', function(){
+  if (cameraInput.files && cameraInput.files.length){
+    // 复用统一文件处理：证件模式下会以 doc 类型加入（图片）
+    handleFiles(cameraInput.files);
+  }
+  cameraInput.value = '';
+});
+
+/* 电子普通发票预设：A4 纵向 + 保持比例完整显示，整表不拆分、不拉伸 */
+function applyEinvPreset(kind){
+  $('paperSize').value = 'a4';
+  $('paperOrient').value = 'portrait';
+  $('fitMode').value = 'contain';
+  $('invMargin').value = 5; $('invMarginVal').textContent = '5mm';
+  var key = kind === 'half' ? '1x2' : '1x1';
+  document.querySelectorAll('#presetGrid button').forEach(function(x){ x.classList.toggle('active', x.dataset.layout === key); });
+  if (state.mode !== 'inv') switchMode('inv'); else render();
+}
+document.querySelectorAll('#einvPreset button').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('#einvPreset button').forEach(function(x){ x.classList.remove('active'); });
+    b.classList.add('active');
+    applyEinvPreset(b.dataset.einv);
+    toast(b.dataset.einv === 'half' ? '已套用电子普通发票预设：A4纵向 2张/页，整表完整显示' : '已套用电子普通发票预设：A4纵向 1张/页，整表完整显示');
+  });
+});
+/* ---------------- 文字 ---------------- */
+var editingTextId = null;
+function openTextModal(it){
+  editingTextId = it ? it.id : null;
+  $('txtContent').value = it ? it.text : '';
+  $('txtSize').value = it ? (it.size||5) : 5;
+  $('txtColor').value = it ? (it.color||'#111111') : '#111111';
+  $('textModal').classList.add('show');
+}
+$('btnAddText').addEventListener('click', function(){ openTextModal(null); });
+$('btnTextOk').addEventListener('click', function(){
+  var txt = $('txtContent').value.trim();
+  if (!txt){ toast('请先输入文字内容'); return; }
+  if (editingTextId){ var it = findItem(editingTextId); if (it){ it.text = txt; it.size = +$('txtSize').value||5; it.color = $('txtColor').value; } }
+  else addItem({ kind:'text', name:'文字', text: txt, size: +$('txtSize').value||5, color: $('txtColor').value });
+  $('textModal').classList.remove('show'); render();
+});
+
+/* ---------------- 模式切换 ---------------- */
+function switchMode(m){
+  if (m !== 'doc' && m !== 'inv') m = 'doc';
+  state.mode = m;
+  document.querySelectorAll('.mode-tabs button').forEach(function(b){ b.classList.toggle('active', b.dataset.mode === m); });
+  ['doc','inv'].forEach(function(k){ $('sec-'+k).classList.toggle('show', k === m); });
+  var camRow = $('cameraRow'); if (camRow) camRow.style.display = (m === 'doc') ? '' : 'none';
+  var addTextBtn = $('btnAddText'); if (addTextBtn) addTextBtn.style.display = (m === 'doc') ? '' : 'none';
+  /* 切换模式互不干扰：选中项不属于新模式时取消选中，两个模式各自的内容、排版与手动位置保持原样 */
+  var sel = state.selectedId != null ? findItem(state.selectedId) : null;
+  if (!sel || bucketOf(sel) !== m) state.selectedId = null;
+  itemBar.style.display = 'none';
+  render();
+}
+document.querySelectorAll('.mode-tabs button').forEach(function(b){
+  b.addEventListener('click', function(){ switchMode(b.dataset.mode); });
+});
+
+/* ---------------- 设置控件 ---------------- */
+$('docType').addEventListener('change', function(){
+  $('customSizeRow').style.display = this.value === 'custom' ? 'grid' : 'none';
+  docItems().forEach(function(it){ it.manual = false; });
+  render();
+});
+['customW','customH','docGap'].forEach(function(id){ $(id).addEventListener('input', function(){ docItems().forEach(function(it){ it.manual=false; }); render(); }); });
+$('docMargin').addEventListener('input', function(){ $('docMarginVal').textContent = this.value; docItems().forEach(function(it){ it.manual=false; }); render(); });
+function setDir(d){
+  state.docDir = d;
+  $('dirV').classList.toggle('active', d==='v'); $('dirH').classList.toggle('active', d==='h');
+  docItems().forEach(function(it){ it.manual = false; }); render();
+}
+$('dirV').addEventListener('click', function(){ setDir('v'); });
+$('dirH').addEventListener('click', function(){ setDir('h'); });
+function autoLayout(){ visibleItems().forEach(function(it){ it.manual = false; }); render(); toast('已按当前设置重新排版'); }
+$('btnAutoDoc').addEventListener('click', autoLayout);
+$('btnAuto2').addEventListener('click', autoLayout);
+
+document.querySelectorAll('#presetGrid button').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('#presetGrid button').forEach(function(x){ x.classList.remove('active'); });
+    b.classList.add('active'); render();
+  });
+});
+$('invMargin').addEventListener('input', function(){ $('invMarginVal').textContent = this.value + 'mm'; render(); });
+$('invGap').addEventListener('input', function(){ $('invGapVal').textContent = this.value + 'mm'; render(); });
+['paperSize','paperOrient','fitMode','optCut','optBorder','optPageNum'].forEach(function(id){ $(id).addEventListener('change', render); });
+
+$('btnZoomIn').addEventListener('click', function(){ state.zoom = Math.min(1.6, state.zoom + 0.15); render(); });
+$('btnZoomOut').addEventListener('click', function(){ state.zoom = Math.max(0.45, state.zoom - 0.15); render(); });
+
+/* 水印 */
+$('btnWmApply').addEventListener('click', function(){
+  state.wm = { text: $('wmText').value.trim(), size: +$('wmSize').value||26, opacity: +$('wmOpacity').value||14,
+    angle: +$('wmAngle').value||0, color: $('wmColor').value, space: +$('wmSpace').value||170 };
+  render(); toast(state.wm.text ? '水印已应用到所有页' : '水印文字为空，已清除水印');
+});
+
+/* ---------------- 汇总表 / CSV ---------------- */
+function renderSummary(){
+  var tb = $('sumBody'); tb.innerHTML = '';
+  var list = invItems();
+  $('sumEmpty').style.display = list.length ? 'none' : 'block';
+  list.forEach(function(it, i){
+    var tr = document.createElement('tr');
+    var g = (+it.net||0) + (+it.tax||0);
+    tr.innerHTML = '<td data-l="#">' + (i+1) + '</td><td data-l="发票名称">' + esc(it.invName || it.name || '') + '</td>' +
+      '<td class="col-date" data-l="开票日期"><input type="date" data-sf="date" value="' + esc(it.date||'') + '" aria-label="开票日期"></td>' +
+      '<td class="col-seller" data-l="销售方"><input type="text" data-sf="seller" placeholder="销售方全名" value="' + esc(it.seller||'') + '" aria-label="销售方"></td>' +
+      '<td class="num col-amt" data-l="不含税"><input type="number" step="0.01" min="0" data-sf="net" placeholder="0.00" value="' + (it.net===''||it.net==null?'':it.net) + '" aria-label="金额（不含税）"></td>' +
+      '<td class="num col-amt" data-l="税额"><input type="number" step="0.01" min="0" data-sf="tax" placeholder="0.00" value="' + (it.tax===''||it.tax==null?'':it.tax) + '" aria-label="税额"></td>' +
+      '<td class="num sum-grand" data-l="价税合计">' + money(g) + '</td>';
+    tr.querySelectorAll('input').forEach(function(inp){
+      inp.addEventListener('input', function(){
+        it[inp.dataset.sf] = inp.value;
+        var gc = tr.querySelector('.sum-grand');
+        if (gc) gc.textContent = money((+it.net||0) + (+it.tax||0));
+        var tt2 = totals();
+        $('sumNet').textContent = money(tt2.n); $('sumTax').textContent = money(tt2.t); $('sumGrand').textContent = money(tt2.g);
+        renderTotals();
+        /* 同步左侧列表对应卡片的输入框与价税合计（不重建汇总表，避免输入失焦） */
+        var card = document.querySelector('#itemList .card[data-id="' + it.id + '"]');
+        if (card){
+          card.querySelectorAll('input[data-f]').forEach(function(ci){ var f = ci.dataset.f; if (ci !== document.activeElement) ci.value = (it[f] == null ? '' : it[f]); });
+          var m = card.querySelector('.cmeta');
+          if (m) m.textContent = '价税合计 ' + money((+it.net||0) + (+it.tax||0)) + (it.date ? ' · ' + it.date : '');
+        }
+      });
+    });
+    tb.appendChild(tr);
+  });
+  var tt = totals();
+  $('sumNet').textContent = money(tt.n); $('sumTax').textContent = money(tt.t); $('sumGrand').textContent = money(tt.g);
+}
+$('btnSummary').addEventListener('click', function(){ renderSummary(); $('summaryModal').classList.add('show'); });
+document.querySelectorAll('[data-close]').forEach(function(b){
+  b.addEventListener('click', function(){ $(b.dataset.close).classList.remove('show'); });
+});
+document.querySelectorAll('.modal').forEach(function(m){
+  m.addEventListener('click', function(e){ if (e.target === m) m.classList.remove('show'); });
+});
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape') document.querySelectorAll('.modal.show').forEach(function(m){ m.classList.remove('show'); }); });
+$('btnCsv').addEventListener('click', function(){
+  var rows = [['发票名称','开票日期','销售方','金额(不含税)','税额','价税合计']];
+  invItems().forEach(function(it){ rows.push([it.invName||it.name||'', it.date||'', it.seller||'', (+it.net||0).toFixed(2), (+it.tax||0).toFixed(2), ((+it.net||0)+(+it.tax||0)).toFixed(2)]); });
+  var tt = totals(); rows.push(['合计','','', tt.n.toFixed(2), tt.t.toFixed(2), tt.g.toFixed(2)]);
+  var csv = '﻿' + rows.map(function(r){ return r.map(function(c){ return '"' + String(c).replace(/"/g,'""') + '"'; }).join(','); }).join('\r\n');
+  download(new Blob([csv], { type:'text/csv;charset=utf-8' }), '发票报销汇总.csv');
+});
+
+/* ---------------- 顶部按钮 ---------------- */
+function download(blob, filename){
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 400);
+}
+$('btnClear').addEventListener('click', function(){
+  var vis = visibleItems();
+  if (!vis.length){ toast(state.mode === 'inv' ? '发票拼排已经是空的了' : '证件拼排已经是空的了'); return; }
+  var m = state.mode;
+  state.items = state.items.filter(function(it){ return bucketOf(it) !== m; });
+  var sel = state.selectedId != null ? findItem(state.selectedId) : null;
+  if (!sel) state.selectedId = null;
+  itemBar.style.display = 'none'; render();
+  toast(m === 'inv' ? '已清空发票拼排的全部发票，证件拼排内容不受影响' : '已清空证件拼排的全部内容，发票拼排内容不受影响');
+});
+$('btnPrint').addEventListener('click', function(){
+  if (!visibleItems().length){ toast(state.mode === 'inv' ? '先在发票拼排添加发票再打印' : '先在证件拼排添加证件再打印'); return; }
+  render();
+  setTimeout(function(){ window.print(); }, 60);
+});
+$('btnPng').addEventListener('click', function(){
+  if (!visibleItems().length){ toast(state.mode === 'inv' ? '先在发票拼排添加发票再保存图片' : '先在证件拼排添加内容再保存图片'); return; }
+  var res = layoutPages(), paper = res.paper;
+  var pi = 0;
+  if (state.selectedId != null){ res.pages.forEach(function(pg, i){ pg.forEach(function(p){ if (p.it.id === state.selectedId) pi = i; }); }); }
+  var dpi = 150, k = dpi / 25.4;
+  var cv = document.createElement('canvas');
+  cv.width = Math.round(paper.w * k); cv.height = Math.round(paper.h * k);
+  var g = cv.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0,0,cv.width,cv.height);
+  var jobs = res.pages[pi].map(function(p){
+    return new Promise(function(resolve){
+      if (p.it.kind === 'text'){
+        g.fillStyle = p.it.color || '#111';
+        g.font = '600 ' + ((p.it.size||5)*k) + 'px "Microsoft YaHei",sans-serif';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(p.it.text, (p.x + p.w/2)*k, (p.y + p.h/2)*k);
+        resolve(); return;
+      }
+      var img = new Image();
+      img.onload = function(){
+        g.save();
+        var effRot2 = state.mode === 'inv' ? invEffRot(p.it) : (p.it.rot||0);
+        if (state.mode === 'inv' && (effRot2 % 180 !== 0)){
+          /* 与预览一致的竖放出图：以格子中心旋转，绘制框宽高互换，按适配模式在互换框内等比/填充 */
+          var bw = p.h*k, bh = p.w*k;
+          var iw = img.naturalWidth || img.width || bw, ih = img.naturalHeight || img.height || bh;
+          var fit2 = $('fitMode').value, dw = bw, dh = bh;
+          if (fit2 !== 'fill'){
+            var s2 = fit2 === 'cover' ? Math.max(bw/iw, bh/ih) : Math.min(bw/iw, bh/ih);
+            dw = iw * s2; dh = ih * s2;
+          }
+          g.translate((p.x+p.w/2)*k, (p.y+p.h/2)*k); g.rotate(effRot2*Math.PI/180);
+          g.drawImage(img, -dw/2, -dh/2, dw, dh);
+        }
+        else if (effRot2){ g.translate((p.x+p.w/2)*k, (p.y+p.h/2)*k); g.rotate(effRot2*Math.PI/180); g.drawImage(img, -p.w*k/2, -p.h*k/2, p.w*k, p.h*k); }
+        else g.drawImage(img, p.x*k, p.y*k, p.w*k, p.h*k);
+        g.restore(); resolve();
+      };
+      img.onerror = resolve;
+      img.src = p.it.src;
+    });
+  });
+  Promise.all(jobs).then(function(){
+    if (state.wm.text){
+      g.save(); g.translate(cv.width/2, cv.height/2); g.rotate(state.wm.angle*Math.PI/180);
+      g.font = '700 ' + state.wm.size*2 + 'px "Microsoft YaHei",sans-serif';
+      g.fillStyle = state.wm.color; g.globalAlpha = state.wm.opacity/100; g.textAlign = 'center';
+      for (var y = -cv.height; y < cv.height; y += state.wm.space*1.6)
+        for (var x = -cv.width; x < cv.width; x += state.wm.space*2.2)
+          g.fillText(state.wm.text, x, y);
+      g.restore();
+    }
+    cv.toBlob(function(b){ download(b, '证票拼排助手-第' + (pi+1) + '页.png'); toast('已保存第 ' + (pi+1) + ' 页图片（150 DPI）'); }, 'image/png');
+  });
+});
+
+/* ---------------- 正副标题字面左对齐校准 ----------------
+   盒子左边缘对齐 ≠ 字面墨迹对齐：首字字形左怀因字体/字号/字重而异。
+   用 Canvas 在本机实际字体下以 4 倍采样实测主标题首字「证」与副标题首字「z」的墨迹左怀，
+   把差值写入副标题 margin-left，使两行墨迹左边缘在本机渲染下落在同一垂直线上。 */
+function calibrateBrandAlign(){
+  try{
+    var h1 = document.querySelector('.brand h1'), sm = document.querySelector('.brand small');
+    if (!h1 || !sm) return;
+    var S = 4, cv = document.createElement('canvas');
+    var ctx = cv.getContext('2d');
+    if (!ctx) return;
+    function inkLeft(el, ch){
+      var cs = getComputedStyle(el);
+      var size = parseFloat(cs.fontSize) || 16;
+      ctx.font = cs.fontWeight + ' ' + (size * S) + 'px ' + cs.fontFamily;
+      var w = Math.ceil(size * 2.4 * S), h = Math.ceil(size * 1.8 * S), ox = Math.ceil(size * 0.7 * S);
+      cv.width = w; cv.height = h;
+      ctx.font = cs.fontWeight + ' ' + (size * S) + 'px ' + cs.fontFamily;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = '#000';
+      ctx.fillText(ch, ox, size * S);
+      var d = ctx.getImageData(0, 0, w, h).data;
+      for (var x = 0; x < w; x++){
+        for (var y = 0; y < h; y++){
+          if (d[(y * w + x) * 4 + 3] > 0) return (x - ox) / S;
+        }
+      }
+      return 0;
+    }
+    var bTitle = inkLeft(h1, '证');
+    var bSub = inkLeft(sm, 'z');
+    sm.style.marginLeft = (Math.round((bTitle - bSub) * 4) / 4) + 'px';
+  }catch(e){ /* 测量失败时保留 CSS 静态兜底值 */ }
+}
+
+/* ---------------- 初始化 ---------------- */
+var resizeTimer = null;
+window.addEventListener('resize', function(){ clearTimeout(resizeTimer); resizeTimer = setTimeout(render, 160); });
+calibrateBrandAlign();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(calibrateBrandAlign);
+window.addEventListener('load', calibrateBrandAlign);
+render();
+if (window.lucide) lucide.createIcons();
+})();
+</script>
+</body>
+</html>
